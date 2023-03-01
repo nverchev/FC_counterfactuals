@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+from sklearn.model_selection import train_test_split
 import torch
 from torch.utils.data import Dataset
 from nilearn import datasets
@@ -8,26 +9,36 @@ from nilearn.connectome import ConnectivityMeasure
 from nilearn.maskers import NiftiLabelsMasker
 
 
-def fetch_preprocess(data_dir):
-    os.mkdir(data_dir)
-    dataset = datasets.fetch_abide_pcp(data_dir=data_dir, legacy_format=False)
-    atlas = datasets.fetch_atlas_basc_multiscale_2015(version='sym', data_dir=data_dir)
-    atlas = atlas.scale444
-    masker = NiftiLabelsMasker(
-        labels_img=atlas,
-        standardize=True,
-        memory='nilearn_cache',
-        verbose=1)
+def fetch_preprocess(data_dir, res):
+    if not os.path.exists(data_dir):
+        os.mkdir(data_dir)
+        dataset = datasets.fetch_abide_pcp(data_dir=data_dir, legacy_format=False)
+        metadata_df = pd.read_csv(os.path.join(data_dir, 'ABIDE_pcp', 'Phenotypic_V1_0b_preprocessed1.csv'))
+        metadata_df = metadata_df[['FILE_ID', 'DX_GROUP']].rename(columns={'FILE_ID': 'file', 'DX_GROUP': 'label'})
+        metadata_df['svc_prob'] = metadata_df['mlp_prob'] = metadata_df['ae_prob'] = np.nan
+        metadata_df.to_csv(os.path.join(data_dir, 'metadata.csv'))
 
-    corr_dir = os.path.join(data_dir, 'corr_matrices')
+    corr_dir = os.path.join(data_dir, 'corr_matrices_' + str(res))
+    if not os.path.exists(corr_dir):
+        os.mkdir(corr_dir)
+        metadata_df = pd.read_csv(os.path.join(data_dir, 'metadata.csv'))
+        atlas = datasets.fetch_atlas_basc_multiscale_2015(version='sym', data_dir=data_dir)
+        # TODO: choose matrix resolution, maybe add more choices to options
+        atlas = atlas.scale444
+        masker = NiftiLabelsMasker(
+            labels_img=atlas,
+            standardize=True,
+            memory='nilearn_cache',
+            verbose=1)
 
-    for i in range(len(dataset.func_preproc)):
-        print(f'Processing {i} of {len(dataset.func_preproc)}')
-        file_id = dataset.phenotypic.iloc[i]['FILE_ID']
-        time_series = masker.fit_transform(dataset.func_preproc[i])
-        correlation_measure = ConnectivityMeasure(kind='correlation')
-        correlation_matrix = correlation_measure.fit_transform([time_series])[0]
-        np.save(os.path.join(corr_dir, f'{file_id}.npy'), correlation_matrix)
+        # FIXME: changed dataset.func_preproc with iter in metadata. Is it equivalent?
+        # FIXME: dataset is not referenced when the dataset has already been downloaded but not processed with new res
+        for i, file_id in enumerate(metadata_df['file']):
+            print(f'Processing {i} of {len(metadata_df)}')
+            time_series = masker.fit_transform(dataset.func_preproc[i])
+            correlation_measure = ConnectivityMeasure(kind='correlation')
+            correlation_matrix = correlation_measure.fit_transform([time_series])[0]
+            np.save(os.path.join(corr_dir, f'{file_id}.npy'), correlation_matrix)
 
 
 class EmptyDataset(Dataset):
@@ -40,17 +51,16 @@ class EmptyDataset(Dataset):
 
 
 class FCSplitDataset(Dataset):
-    def __init__(self, metadata, data_dir, **dataset_settings):
+    def __init__(self, metadata, data_dir, res, **dataset_settings):
         self.input_files = metadata['file'].values
         # TODO: use the same labels everywhere
         self.labels = metadata['label'].values - 1  # 1 -> 0, 2 -> 1
-        self.matrices = np.zeros(shape=(len(self.labels), 98346))
-        matrices_path = os.path.join(data_dir, 'corr_matrices')
+        self.matrices = np.zeros(shape=(len(self.labels), res * (res - 1) // 2))
+        matrices_path = os.path.join(data_dir, 'corr_matrices_' + str(res))
         for idx, file in enumerate(self.input_files):
-            matrix = np.load(os.path.join(matrices_path, file))
-            # TODO: store triu directly
-            # FIXME: dynamically change 98346 and 444 depending on the matrix resolution
-            x = matrix[np.triu_indices(444, k=1)]
+            matrix = np.load(os.path.join(matrices_path, file + '.npy'))
+            # TODO: store triu directly ?
+            x = matrix[np.triu_indices(res, k=1)]
             self.matrices[idx] = x
 
     def __len__(self):
@@ -63,40 +73,45 @@ class FCSplitDataset(Dataset):
 
 
 class FCDataset:
-    def __init__(self, data_dir, **dataset_settings):
+    def __init__(self, data_dir, res, **dataset_settings):
         self.data_dir = data_dir
         self.dataset_settings = dataset_settings
-        # TODO: get metadata
-        # metadata = pd.read_csv(os.path.join(data_dir, 'ABIDE_pcp', 'Phenotypic_V1_0b_preprocessed1.csv'))
-        # TODO: dataset partition logic here
-        self.partition()
+        self.res = res
+        metadata_df = pd.read_csv(os.path.join(data_dir, 'metadata.csv'))
+        train_val_df, test_df = train_test_split(metadata_df, test_size=0.2, random_state=2023)
+        train_df, val_df = train_test_split(train_val_df, test_size=0.2, random_state=2023)
+        self.partitions = {
+            'train_val': train_val_df,
+            'test': test_df,
+            'train': train_df,
+            'val': val_df
+        }
 
     def split(self, split):
-        # TODO: more info than just labels (probabilities from classifier for example)
-        metadata_path = os.path.join(self.data_dir, f'labels_{split}.csv')
-        metadata = pd.read_csv(metadata_path)
-
-        return FCSplitDataset(metadata, self.data_dir, **self.dataset_settings)
+        metadata = self.partitions[split]
+        return FCSplitDataset(metadata, self.data_dir, self.res, **self.dataset_settings)
 
     def partition(self):
         return
 
 
-def get_loaders(data_dir, init_res, batch_size, **other_settings):
-
+def get_loaders(data_dir, res, batch_size, exp, **other_settings):
     dataset_settings = dict(
-        resolution=init_res
+        res=res
     )
 
-    if not os.path.exists(data_dir):
-        fetch_preprocess(data_dir)
+    fetch_preprocess(data_dir, res)
 
     pin_memory = torch.cuda.is_available()
     dataset = FCDataset(data_dir=data_dir, **dataset_settings)
-    train_dataset = dataset.split('train')
-    # FIXME: only labels_train and labels_test
-    val_dataset = EmptyDataset()
-    test_dataset = dataset.split('test')
+    if exp[:5] == 'final':
+        train_dataset = dataset.split('train_val')
+        val_dataset = EmptyDataset()
+        test_dataset = dataset.split('test')
+    else:
+        train_dataset = dataset.split('train')
+        val_dataset = dataset.split('val')
+        test_dataset = EmptyDataset()
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset, drop_last=True, batch_size=batch_size, shuffle=True, pin_memory=pin_memory)

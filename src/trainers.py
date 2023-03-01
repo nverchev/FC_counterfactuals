@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import torch.nn.functional as F
 from torch.cuda.amp import GradScaler
 from torch import autocast
 import os
@@ -14,7 +13,6 @@ from src.dataset import get_loaders
 from src.models import get_model
 from src.loss_and_metrics import get_vae_loss, get_ae_loss, get_mlp_loss
 from src.optim import get_opt, CosineSchedule
-
 
 
 # Allows a temporary change using the with statement
@@ -464,7 +462,8 @@ class AETrainer(Trainer):
 
 
 def get_trainer(args):
-    torch.manual_seed = np.random.seed = args.seed
+    if args.seed:
+        torch.manual_seed = np.random.seed = args.seed
     train_loader, val_loader, test_loader = get_loaders(**vars(args))
     model = get_model(**vars(args))
     optimizer, optim_args = get_opt(args.optim, args.lr, args.wd)
@@ -499,4 +498,3 @@ def get_trainer(args):
         trainer.load(args.load)
 
     return trainer
-

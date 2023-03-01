@@ -1,8 +1,11 @@
 import torch
 import torch.nn as nn
-from abc import abstractmethod
+from abc import abstractmethod, ABCMeta
 from src.layers import FromLatentConv, ResBlock, View, ConvBlock, ToLatentConvADAIN
-from src.utils import reversed_zip, ABCHookAfterInit
+
+
+def reversed_zip(*args):
+    return zip(*map(reversed, args))
 
 
 class MLP(nn.Module):
@@ -36,12 +39,11 @@ class AE(nn.Module):
         self.encode = nn.Sequential(*hidden_layers, nn.Linear(layers[-2], z_dim))
 
         hidden_layers = []
-        rev_layers = layers[::-1]
-        for in_features, out_features in zip(rev_layers[:-1], rev_layers[1:-1]):
+        for in_features, out_features in reversed_zip(layers[:-1], layers[1:-1]):
             hidden_layers.append(nn.Linear(in_features, out_features))
             hidden_layers.append(nn.ReLU())
 
-        self.decode = nn.Sequential(*hidden_layers, nn.Linear(rev_layers[-2], x_dim))
+        self.decode = nn.Sequential(*hidden_layers, nn.Linear(layers[1], x_dim))
         self.settings = dict(hidden_layers=layers)
 
     def forward(self, x):
@@ -57,7 +59,7 @@ class AE(nn.Module):
         return data
 
 
-class AbstractVAE(nn.Module, metaclass=ABCHookAfterInit):
+class AbstractVAE(nn.Module, metaclass=ABCMeta):
     in_channels = 2
     out_channel = 1
     dim_target = 0
@@ -258,10 +260,9 @@ class VAEX(AbstractVAE):
         return data
 
 
-def get_model(name, init_res, z_dim, **other_settings):
-
+def get_model(name, res, z_dim, **other_settings):
     # num_feature_above_diagonal:
-    x_dim = init_res * (init_res - 1) // 2
+    x_dim = res * (res - 1) // 2
 
     model_settings = dict(
         x_dim=x_dim,
