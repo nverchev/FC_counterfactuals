@@ -22,6 +22,7 @@ train_data = train_loader.dataset.matrices
 train_labels = train_loader.dataset.labels
 
 model = SVC(kernel=kernel, C=C, gamma='auto', random_state=2023, probability=True)
+print('Fitting the model ...')
 model.fit(train_data, train_labels)
 pickle.dump(model, open(os.path.join(data_dir, exp_name), 'wb'))
 

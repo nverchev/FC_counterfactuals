@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset
 from nilearn import datasets
 from nilearn.connectome import ConnectivityMeasure
-from nilearn.input_data import NiftiLabelsMasker
+from nilearn.maskers import NiftiLabelsMasker
 
 
 def fetch_preprocess(data_dir):

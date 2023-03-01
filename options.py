@@ -79,6 +79,7 @@ def parse_mlp_args():
     parser.add_argument('--load', type=bounded_num(int, imin=-1), default=-1,
                         help='Load a saved model with the same settings. -1 for starting from scratch,'
                              '0 for most recent, otherwise epoch after which the model was saved')
+    parser.add_argument('--pretrained', action='store_true', default=False, help='from AE model with same exp name)')
     parser.add_argument('--eval', action='store_true', default=False, help='Evaluate the model)')
 
     return parser

@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import os
+import json
 from options import parse_mlp_args
 from src.dataset import get_loaders
 from src.optim import get_opt, CosineSchedule
@@ -11,6 +12,7 @@ from src.models import get_mlp
 def main():
     args = parse_mlp_args().parse_args()
     exp_name = 'mlp' + '_' * bool(args.exp) + args.exp
+    pretrained = args.pretrained
     dir_path = args.dir_path
     data_dir = os.path.join(dir_path, 'abide_fc_dataset')
     resolution = args.init_resolution
@@ -64,6 +66,13 @@ def main():
         trainer.load()
     elif load > 0:
         trainer.load(load)
+    elif pretrained:
+        ae_path = os.path.join(data_dir, 'models', 'ae' + exp_name[4:])
+        final_epoch = json.load(open(os.path.join(ae_path, 'settings.json')))['training_epochs']
+        state = torch.load(os.path.join(ae_path, f'model_epoch{final_epoch}.pt'), map_location=torch.device(device))
+        trainer.model.load_state_dict(state, strict=False)
+        print('Pretrained weights loaded.')
+
     if not model_eval:
         while training_epochs > trainer.epoch:
             trainer.train(checkpoint_every)

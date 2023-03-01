@@ -9,51 +9,39 @@ class MLP(nn.Module):
 
     def __init__(self, x_dim=98346):
         super().__init__()
-        layers = [512, 256, 32]
+        layers = [x_dim, 512, 256, 32]
         hidden_layers = []
-        for i in range(len(layers) - 1):
-            hidden_layers.append(nn.Linear(layers[i], layers[i + 1]))
+        for in_features, out_features in zip(layers[:-1], layers[1:]):
+            hidden_layers.append(nn.Linear(in_features, out_features))
             hidden_layers.append(nn.ReLU())
-        self.net = nn.Sequential(
-            nn.Linear(x_dim, layers[0]),
-            nn.ReLU(),
-            *hidden_layers,
-            nn.Linear(layers[-1], 1)
-        )
+        self.encode = nn.Sequential(*hidden_layers)
+        self.classifier = nn.Linear(layers[-1], 1)
         self.settings = dict(hidden_layers=layers)
 
     def forward(self, x):
-        x = self.net(x)
+        x = self.encode(x)
+        x = self.classifier(x)
         return {'logits': x}
 
 
 class AE(nn.Module):
 
-    def __init__(self, x_dim=98346, z_dim=64):
+    def __init__(self, x_dim=98346, z_dim=32):
         super().__init__()
-        layers = [512, 256, 128]
+        layers = [x_dim, 512, 256, z_dim]
         hidden_layers = []
-        for i in range(len(layers) - 1):
-            hidden_layers.append(nn.Linear(layers[i], layers[i + 1]))
+        for in_features, out_features in zip(layers[:-1], layers[1:-1]):
+            hidden_layers.append(nn.Linear(in_features, out_features))
+            hidden_layers.append(nn.ReLU())
+        self.encode = nn.Sequential(*hidden_layers, nn.Linear(layers[-2], z_dim))
+
+        hidden_layers = []
+        rev_layers = layers[::-1]
+        for in_features, out_features in zip(rev_layers[:-1], rev_layers[1:-1]):
+            hidden_layers.append(nn.Linear(in_features, out_features))
             hidden_layers.append(nn.ReLU())
 
-        self.encode = nn.Sequential(
-            nn.Linear(x_dim, layers[0]),
-            nn.ReLU(),
-            *hidden_layers,
-            nn.Linear(layers[-1], z_dim)
-        )
-        hidden_layers = []
-        for i in range(len(layers) - 1):
-            hidden_layers.append(nn.Linear(layers[i + 1], layers[i]))
-            hidden_layers.append(nn.ReLU())
-
-        self.decode = nn.Sequential(
-            nn.Linear(z_dim, layers[-1]),
-            nn.ReLU(),
-            *reversed(hidden_layers),
-            nn.Linear(layers[0], x_dim)
-        )
+        self.decode = nn.Sequential(*hidden_layers, nn.Linear(rev_layers[-2], x_dim))
         self.settings = dict(hidden_layers=layers)
 
     def forward(self, x):
