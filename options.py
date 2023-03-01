@@ -1,4 +1,5 @@
 import argparse
+import os.path
 from argparse import ArgumentTypeError
 
 
@@ -19,113 +20,73 @@ def bounded_num(numeric_type, imin=None, imax=None):
     return check_lower_bound
 
 
-def parse_main_args():
-    parser = argparse.ArgumentParser(description='Counterfactual VAE options')
+class CommonParser(argparse.ArgumentParser):
+    # Defaults of specific Parser
+    _defaults = {}
 
-    parser.add_argument('--exp', type=str, default='', help='Name of the experiment')
-    parser.add_argument('--dir_path', type=str, default='/scratch/dataset',
-                        help='Directory for storing data and models')
-    parser.add_argument('--batch_size', type=bounded_num(int, imin=1), default=64)
-    parser.add_argument('--init_resolution', type=int, default=129, choices=[129], help='Only one option for now')
-    parser.add_argument('--n_spatial_compressions', type=int, default=5, choices=[4, 5])
-    parser.add_argument('--optim', type=str, default='AdamW', choices=['SGD', 'SGD_momentum', 'Adam', 'AdamW'],
-                        help='SGD_momentum has momentum = 0.9')
-    parser.add_argument('--lr', type=bounded_num(float, imin=0), default=0.001, help='Learning rate')
-    parser.add_argument('--wd', type=bounded_num(float, imin=0), default=0.00001, help='Weight decay')
-    parser.add_argument('--min_decay', type=bounded_num(float, imin=0), default=0.01,
-                        help='fraction of the initial lr at the end of train')
-    parser.add_argument('--c_reg', type=bounded_num(float, imin=0), default=0.05, help='Coefficient for regularization')
-    parser.add_argument('--no_cuda', action='store_true', default=False, help='Runs on CPU')
-    parser.add_argument('--epochs', type=bounded_num(int, imin=1), default=350, help='Number of total training epochs')
-    parser.add_argument('--decay_period', type=bounded_num(int, imin=0), default=250,
-                        help='Number of epochs before lr decays stops')
-    parser.add_argument('--checkpoint', type=bounded_num(int, imin=1), default=10,
-                        help='Number of epochs between checkpoints')
-    parser.add_argument('--ind', type=bounded_num(int, imin=0), default=[0], nargs='+',
-                        help='index for reconstruction to visualize and counterfact')
-    parser.add_argument('--load', type=bounded_num(int, imin=-1), default=-1,
-                        help='Load a saved model with the same settings. -1 for starting from scratch,'
-                             '0 for most recent, otherwise epoch after which the model was saved')
-    parser.add_argument('--eval', action='store_true', default=False, help='Evaluate the model)')
-    parser.add_argument('--gen', type=bounded_num(int, imin=0), default=0, help='Generate /number/ random samples)')
+    def __init__(self, name):
+        super().__init__(name)
+        self.add_argument('--exp', type=str, default='', help='Name of the experiment')
+        self.add_argument('--data_dir', type=str, default='', help='Directory for data and models')
+        self.add_argument('--init_res', type=bounded_num(int, imin=1), default=444, help='Initial resolution')
+        self.add_argument('--z_dim', type=bounded_num(int, imin=1), default=32, help='dim encoding/final features')
+        self.add_argument('--batch_size', type=bounded_num(int, imin=1), default=64)
+        self.add_argument('--optim', type=str, default='AdamW', choices=['SGD', 'SGD_momentum', 'Adam', 'AdamW'],
+                          help='SGD_momentum has momentum = 0.9')
+        self.add_argument('--lr', type=bounded_num(float, imin=0), default=0.001, help='Learning rate')
+        self.add_argument('--wd', type=bounded_num(float, imin=0), default=0.00001, help='Weight decay')
+        self.add_argument('--c_reg', type=bounded_num(float, imin=0), default=0.05,
+                          help='Coefficient for regularization')
+        self.add_argument('--epochs', type=bounded_num(int, imin=1), default=350,
+                          help='Number of total training epochs')
+        self.add_argument('--decay_period', type=bounded_num(int, imin=0), default=250,
+                          help='Number of epochs before lr decays stops')
+        self.add_argument('--min_decay', type=bounded_num(float, imin=0), default=1,
+                          help='fraction of the initial lr at the end of train')
+        self.add_argument('--checkpoint', type=bounded_num(int, imin=1), default=10,
+                          help='Number of epochs between checkpoints')
+        self.add_argument('--no_cuda', action='store_true', default=False, help='Runs on CPU')
+        self.add_argument('--load', type=bounded_num(int, imin=-1), default=-1,
+                          help='Load a saved model with the same settings. -1 for starting from scratch,'
+                               '0 for most recent, otherwise epoch after which the model was saved')
+        self.add_argument('--eval', action='store_true', default=False, help='Evaluate the model)')
+        self.add_argument('--seed', type=bounded_num(int, imin=1), default=0, help='Torch/Numpy seed (0 no seed)')
 
-    return parser
-
-
-# TODO: write common arguments only once
-def parse_mlp_args():
-    parser = argparse.ArgumentParser(description='MLP options')
-
-    parser.add_argument('--exp', type=str, default='', help='Name of the experiment')
-    parser.add_argument('--dir_path', type=str, default='/scratch/dataset',
-                        help='Directory for storing data and models')
-    parser.add_argument('--batch_size', type=bounded_num(int, imin=1), default=64)
-    parser.add_argument('--init_resolution', type=int, default=129, choices=[129], help='Only one option for now')
-    parser.add_argument('--optim', type=str, default='AdamW', choices=['SGD', 'SGD_momentum', 'Adam', 'AdamW'],
-                        help='SGD_momentum has momentum = 0.9')
-    parser.add_argument('--lr', type=bounded_num(float, imin=0), default=0.001, help='Learning rate')
-    parser.add_argument('--wd', type=bounded_num(float, imin=0), default=0.00001, help='Weight decay')
-    parser.add_argument('--min_decay', type=bounded_num(float, imin=0), default=0.01,
-                        help='fraction of the initial lr at the end of train')
-    parser.add_argument('--c_reg', type=bounded_num(float, imin=0), default=0.05,
-                        help='Coefficient for regularization')
-    parser.add_argument('--no_cuda', action='store_true', default=False, help='Runs on CPU')
-    parser.add_argument('--epochs', type=bounded_num(int, imin=1), default=350,
-                        help='Number of total training epochs')
-    parser.add_argument('--decay_period', type=bounded_num(int, imin=0), default=250,
-                        help='Number of epochs before lr decays stops')
-    parser.add_argument('--checkpoint', type=bounded_num(int, imin=1), default=10,
-                        help='Number of epochs between checkpoints')
-    parser.add_argument('--load', type=bounded_num(int, imin=-1), default=-1,
-                        help='Load a saved model with the same settings. -1 for starting from scratch,'
-                             '0 for most recent, otherwise epoch after which the model was saved')
-    parser.add_argument('--pretrained', action='store_true', default=False, help='from AE model with same exp name)')
-    parser.add_argument('--eval', action='store_true', default=False, help='Evaluate the model)')
-
-    return parser
+        if os.path.exists('dataset_path.txt'):
+            with open('dataset_path.txt', 'r') as f:
+                self.set_defaults(data_dir=f.read())
+        self.set_defaults(name=name, **self._defaults)
 
 
-# TODO: write common arguments only once
-def parse_ae_args():
-    parser = argparse.ArgumentParser(description='AE options')
+class MainParser(CommonParser):
+    _defaults = {'lr': 0.01,
+                 'min_decay': 0.01}
 
-    parser.add_argument('--exp', type=str, default='', help='Name of the experiment')
-    parser.add_argument('--dir_path', type=str, default='/scratch/dataset',
-                        help='Directory for storing data and models')
-    parser.add_argument('--batch_size', type=bounded_num(int, imin=1), default=64)
-    parser.add_argument('--init_resolution', type=int, default=129, choices=[129], help='Only one option for now')
-    parser.add_argument('--optim', type=str, default='AdamW', choices=['SGD', 'SGD_momentum', 'Adam', 'AdamW'],
-                        help='SGD_momentum has momentum = 0.9')
-    parser.add_argument('--lr', type=bounded_num(float, imin=0), default=0.001, help='Learning rate')
-    parser.add_argument('--wd', type=bounded_num(float, imin=0), default=0.00001, help='Weight decay')
-    parser.add_argument('--min_decay', type=bounded_num(float, imin=0), default=0.01,
-                        help='fraction of the initial lr at the end of train')
-    parser.add_argument('--c_reg', type=bounded_num(float, imin=0), default=0.05,
-                        help='Coefficient for regularization')
-    parser.add_argument('--no_cuda', action='store_true', default=False, help='Runs on CPU')
-    parser.add_argument('--epochs', type=bounded_num(int, imin=1), default=350,
-                        help='Number of total training epochs')
-    parser.add_argument('--decay_period', type=bounded_num(int, imin=0), default=250,
-                        help='Number of epochs before lr decays stops')
-    parser.add_argument('--checkpoint', type=bounded_num(int, imin=1), default=10,
-                        help='Number of epochs between checkpoints')
-    parser.add_argument('--load', type=bounded_num(int, imin=-1), default=-1,
-                        help='Load a saved model with the same settings. -1 for starting from scratch,'
-                             '0 for most recent, otherwise epoch after which the model was saved')
-    parser.add_argument('--eval', action='store_true', default=False, help='Evaluate the model)')
+    def __init__(self):
+        super().__init__('Counterfactual VAE')
 
-    return parser
+        self.add_argument('--ind', type=bounded_num(int, imin=0), default=[0], nargs='+',
+                          help='index for reconstruction to visualize and counterfact')
+        self.add_argument('--gen', type=bounded_num(int, imin=0), default=0, help='Generate /number/ random samples)')
 
-# TODO: write common arguments only once
-def parse_svc_args():
-    parser = argparse.ArgumentParser(description='SVC options')
 
-    parser.add_argument('--exp', type=str, default='', help='Name of the experiment')
-    parser.add_argument('--dir_path', type=str, default='/scratch/dataset',
-                        help='Directory for storing data and models')
-    parser.add_argument('--kernel', type=str, default='rbf', choices=['linear', 'rbf', 'poly'],
-                        help='kernel SVC')
-    parser.add_argument('--C', type=bounded_num(float, imin=0), default=100, help='Regularization parameter')
-    parser.add_argument('--eval', action='store_true', default=False, help='Evaluate the model)')
+class MLPParser(CommonParser):
 
-    return parser
+    def __init__(self):
+        super().__init__('MLP')
+        self.add_argument('--pretrain', action='store_true', default=False, help='load AE model with same exp name)')
+
+
+class AEParser(CommonParser):
+
+    def __init__(self):
+        super().__init__('AE')
+
+
+class SVCParser(CommonParser):
+
+    def __init__(self):
+        super().__init__('SVC')
+        self.add_argument('--kernel', type=str, default='rbf', choices=['linear', 'rbf', 'poly'], help='kernel SVC')
+        self.add_argument('--C', type=bounded_num(float, imin=0), default=100, help='Regularization parameter')
+        self.add_argument('--eval', action='store_true', default=False, help='Evaluate the model)')

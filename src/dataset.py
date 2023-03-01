@@ -30,8 +30,6 @@ def fetch_preprocess(data_dir):
         np.save(os.path.join(corr_dir, f'{file_id}.npy'), correlation_matrix)
 
 
-
-
 class EmptyDataset(Dataset):
 
     def __len__(self):
@@ -84,12 +82,16 @@ class FCDataset:
         return
 
 
-def get_loaders(batch_size, data_dir, **dataset_settings):
+def get_loaders(data_dir, init_res, batch_size, **other_settings):
+
+    dataset_settings = dict(
+        resolution=init_res
+    )
+
     if not os.path.exists(data_dir):
         fetch_preprocess(data_dir)
 
     pin_memory = torch.cuda.is_available()
-
     dataset = FCDataset(data_dir=data_dir, **dataset_settings)
     train_dataset = dataset.split('train')
     # FIXME: only labels_train and labels_test

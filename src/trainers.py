@@ -10,7 +10,11 @@ from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 from abc import ABCMeta, abstractmethod
 from collections import UserDict
+from src.dataset import get_loaders
+from src.models import get_model
 from src.loss_and_metrics import get_vae_loss, get_ae_loss, get_mlp_loss
+from src.optim import get_opt, CosineSchedule
+
 
 
 # Allows a temporary change using the with statement
@@ -459,13 +463,40 @@ class AETrainer(Trainer):
         return self._metrics(output, inputs, targets)
 
 
-def get_ae_trainer(model, exp_name, block_args):
-    return AETrainer(model, exp_name, block_args)
+def get_trainer(args):
+    torch.manual_seed = np.random.seed = args.seed
+    train_loader, val_loader, test_loader = get_loaders(**vars(args))
+    model = get_model(**vars(args))
+    optimizer, optim_args = get_opt(args.optim, args.lr, args.wd)
+    device = torch.device('cuda:0' if torch.cuda.is_available() and not args.no_cuda else 'cpu')
+    trainer_settings = dict(
+        opt_name=args.optim,
+        optimizer=optimizer,
+        optim_args=optim_args,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        test_loader=test_loader,
+        device=device,
+        batch_size=args.batch_size,
+        training_epochs=args.epochs,
+        c_reg=args.c_reg,
+        data_dir=args.data_dir,
+        schedule=CosineSchedule(decay_steps=args.decay_period, min_decay=args.min_decay),
+    )
+    exp_name = '_'.join(args.name.lower().split(' ') + [args.exp]).strip('_')
 
+    trainer_mapping = {
+        'AE': AETrainer,
+        'MLP': MLPTrainer,
+        'Counterfactual VAE': VAETrainer
+    }
+    trainer = trainer_mapping[args.name](model, exp_name, trainer_settings)
 
-def get_vae_trainer(model, exp_name, block_args):
-    return VAETrainer(model, exp_name, block_args)
+    # loads last model
+    if args.load == 0:
+        trainer.load()
+    elif args.load > 0:
+        trainer.load(args.load)
 
+    return trainer
 
-def get_mlp_trainer(model, exp_name, block_args):
-    return MLPTrainer(model, exp_name, block_args)

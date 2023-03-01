@@ -7,9 +7,9 @@ from src.utils import reversed_zip, ABCHookAfterInit
 
 class MLP(nn.Module):
 
-    def __init__(self, x_dim=98346):
+    def __init__(self, x_dim, z_dim):
         super().__init__()
-        layers = [x_dim, 512, 256, 32]
+        layers = [x_dim, 512, 256, z_dim]
         hidden_layers = []
         for in_features, out_features in zip(layers[:-1], layers[1:]):
             hidden_layers.append(nn.Linear(in_features, out_features))
@@ -26,7 +26,7 @@ class MLP(nn.Module):
 
 class AE(nn.Module):
 
-    def __init__(self, x_dim=98346, z_dim=32):
+    def __init__(self, x_dim, z_dim):
         super().__init__()
         layers = [x_dim, 512, 256, z_dim]
         hidden_layers = []
@@ -258,13 +258,20 @@ class VAEX(AbstractVAE):
         return data
 
 
-def get_mlp(**model_settings):
-    return MLP()
+def get_model(name, init_res, z_dim, **other_settings):
 
+    # num_feature_above_diagonal:
+    x_dim = init_res * (init_res - 1) // 2
 
-def get_vae(**model_settings):
-    return VAEX(**model_settings)
+    model_settings = dict(
+        x_dim=x_dim,
+        z_dim=z_dim,
+    )
 
+    model_mapping = {
+        'AE': AE,
+        'MLP': MLP,
+        'Counterfactual VAE': VAEX
+    }
 
-def get_ae(**model_settings):
-    return AE()
+    return model_mapping[name](**model_settings)
