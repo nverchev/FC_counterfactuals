@@ -10,22 +10,21 @@ from nilearn.maskers import NiftiLabelsMasker
 
 
 def fetch_preprocess(data_dir, res):
+    metadata_df = pd.read_csv(os.path.join(data_dir, 'ABIDE_pcp', 'Phenotypic_V1_0b_preprocessed1.csv'))
+    quality_checks = [
+        metadata_df['qc_rater_1'] == 'OK',
+        metadata_df['qc_anat_rater_2'].isin(['OK', 'maybe']),
+        metadata_df['qc_func_rater_2'].isin(['OK', 'maybe']),
+        metadata_df['qc_anat_rater_3'] == 'OK',
+        metadata_df['qc_func_rater_3'] == 'OK'
+    ]
+    metadata_df = metadata_df.loc[np.logical_and.reduce(quality_checks)]
+    metadata_df = metadata_df[['FILE_ID', 'DX_GROUP']].rename(columns={'FILE_ID': 'file', 'DX_GROUP': 'label'})
+    metadata_df['svc_prob'] = metadata_df['mlp_prob'] = metadata_df['ae_prob'] = np.nan
+    metadata_df.to_csv(os.path.join(data_dir, 'metadata.csv'))
     if not os.path.exists(data_dir):
         os.mkdir(data_dir)
         dataset = datasets.fetch_abide_pcp(data_dir=data_dir, legacy_format=False)
-        metadata_df = pd.read_csv(os.path.join(data_dir, 'ABIDE_pcp', 'Phenotypic_V1_0b_preprocessed1.csv'))
-        quality_checks = [
-            metadata_df['qc_rater_1'] == 'OK',
-            metadata_df['qc_anat_rater_2'].isin(['OK', 'maybe']),
-            metadata_df['qc_func_rater_2'].isin(['OK', 'maybe']),
-            metadata_df['qc_anat_rater_3'] == 'OK',
-            metadata_df['qc_func_rater_3'] == 'OK'
-        ]
-        metadata_df = metadata_df.loc[np.logical_and.reduce(quality_checks)]
-        metadata_df = metadata_df[['FILE_ID', 'DX_GROUP']].rename(columns={'FILE_ID': 'file', 'DX_GROUP': 'label'})
-        metadata_df['svc_prob'] = metadata_df['mlp_prob'] = metadata_df['ae_prob'] = np.nan
-        metadata_df.to_csv(os.path.join(data_dir, 'metadata.csv'))
-
 
     corr_dir = os.path.join(data_dir, 'corr_matrices_' + str(res))
     if not os.path.exists(corr_dir):
@@ -40,8 +39,8 @@ def fetch_preprocess(data_dir, res):
             memory='nilearn_cache',
             verbose=1)
 
-        # FIXME: changed dataset.func_preproc with iter in metadata. Is it equivalent?
-        # FIXME: dataset is not referenced when the dataset has already been downloaded but not processed with new res
+        # FIXME: variable "dataset" is not referenced when the dataset
+        #  has already been downloaded but not processed with new res
         for i, file_id in enumerate(metadata_df['file']):
             print(f'Processing {i} of {len(metadata_df)}')
             time_series = masker.fit_transform(dataset.func_preproc[i])
@@ -61,12 +60,12 @@ class EmptyDataset(Dataset):
 
 class FCSplitDataset(Dataset):
     def __init__(self, metadata, data_dir, res, **dataset_settings):
-        self.input_files = metadata['file'].values
+        self.metadata = metadata
         # TODO: use the same labels everywhere
         self.labels = metadata['label'].values - 1  # 1 -> 0, 2 -> 1
         self.matrices = np.zeros(shape=(len(self.labels), res * (res - 1) // 2))
         matrices_path = os.path.join(data_dir, 'corr_matrices_' + str(res))
-        for idx, file in enumerate(self.input_files):
+        for idx, file in enumerate(self.metadata['file']):
             matrix = np.load(os.path.join(matrices_path, file + '.npy'))
             # TODO: store triu directly ?
             x = matrix[np.triu_indices(res, k=1)]
@@ -110,7 +109,6 @@ def get_loaders(data_dir, res, batch_size, exp, **other_settings):
     )
 
     fetch_preprocess(data_dir, res)
-
     pin_memory = torch.cuda.is_available()
     dataset = FCDataset(data_dir=data_dir, **dataset_settings)
     if exp[:5] == 'final':
@@ -123,7 +121,7 @@ def get_loaders(data_dir, res, batch_size, exp, **other_settings):
         test_dataset = EmptyDataset()
 
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, drop_last=True, batch_size=batch_size, shuffle=True, pin_memory=pin_memory)
+        train_dataset, drop_last=False, batch_size=batch_size, shuffle=True, pin_memory=pin_memory)
 
     val_loader = torch.utils.data.DataLoader(
         val_dataset, drop_last=False, batch_size=batch_size, shuffle=False, pin_memory=pin_memory)

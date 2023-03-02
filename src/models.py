@@ -39,7 +39,7 @@ class AE(nn.Module):
         self.encode = nn.Sequential(*hidden_layers, nn.Linear(layers[-2], z_dim))
 
         hidden_layers = []
-        for in_features, out_features in reversed_zip(layers[:-1], layers[1:-1]):
+        for in_features, out_features in reversed_zip(layers[1:], layers[1:-1]):
             hidden_layers.append(nn.Linear(in_features, out_features))
             hidden_layers.append(nn.ReLU())
 

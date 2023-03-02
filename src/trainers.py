@@ -4,7 +4,6 @@ from torch.cuda.amp import GradScaler
 from torch import autocast
 import os
 import json
-import re
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 from abc import ABCMeta, abstractmethod
@@ -93,7 +92,7 @@ class Trainer(metaclass=ABCMeta):
     max_output = np.inf  # maximum amount of stored evaluated test samples
 
     def __init__(self, model, exp_name, device, optimizer, train_loader, val_loader=None,
-                 test_loader=None, models_path='./models', amp=True, **block_args):
+                 test_loader=None, models_path='./models', amp=False, **block_args):
 
         self.epoch = 0
         self.device = device  # to cuda or not to cuda?
@@ -104,6 +103,7 @@ class Trainer(metaclass=ABCMeta):
         self.optimizer_settings = block_args['optim_args'].copy()
         self.optimizer = optimizer(**self.optimizer_settings)
         self.scaler = GradScaler(enabled=amp and self.device.type == 'cuda')
+        self.amp = amp
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.test_loader = test_loader
@@ -199,16 +199,16 @@ class Trainer(metaclass=ABCMeta):
             epoch_seen += indices.shape[0]
             inputs, targets = self.recursive_to([inputs, targets], self.device)
             inputs_aux = self.helper_inputs(inputs, targets)
-            with autocast(device_type=self.device.type, dtype=torch.float16):
+            with autocast(device_type=self.device.type, dtype=torch.float16, enabled=self.amp):
                 outputs = self.model(**inputs_aux)
             if torch.is_inference_mode_enabled():
-                with autocast(device_type=self.device.type, dtype=torch.float16):
+                with autocast(device_type=self.device.type, dtype=torch.float16, enabled=self.amp):
                     batch_metrics = self.metrics(outputs, inputs, targets)
                 for metric, value in batch_metrics.items():
                     epoch_metrics[metric] = epoch_metrics.get(metric, 0) + value.item()
 
             else:
-                with autocast(device_type=self.device.type, dtype=torch.float16):
+                with autocast(device_type=self.device.type, dtype=torch.float16, enabled=self.amp):
                     batch_loss = self.loss(outputs, inputs, targets)
                 criterion = batch_loss['Criterion']
                 if torch.isnan(criterion):
@@ -301,7 +301,7 @@ class Trainer(metaclass=ABCMeta):
             if os.path.exists(local_path):
                 for file in os.listdir(local_path):
                     if file[:5] == 'model':
-                        past_epochs.append(int(re.sub('\D', '', file)))
+                        past_epochs.append(int(''.join(filter(str.isdigit, file))))
             if not past_epochs:
                 print('No saved models found')
                 return
@@ -444,6 +444,15 @@ class MLPTrainer(Trainer):
 
     def metrics(self, output, inputs, targets):
         return self._metrics(output, inputs, targets)
+
+    def update_metadata(self, partition, prob_name):
+        self.test(partition=partition, save_outputs=True)
+        loader = self.train_loader if partition == 'train' else self.test_loader
+        metadata = loader.dataset.metadata
+        indices = torch.stack(self.test_metadata['indices'])
+        probs = torch.sigmoid(torch.cat(self.test_outputs['logits']))
+        metadata[prob_name].values[indices] = probs
+        return metadata
 
 
 class AETrainer(Trainer):
