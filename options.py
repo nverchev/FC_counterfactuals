@@ -64,7 +64,7 @@ class MainParser(CommonParser):
 
     def __init__(self):
         super().__init__('Counterfactual VAE')
-
+        self.add_argument('--cond', choices=['svc', 'mlp', 'ae'], default='svc', help='Evaluate the model)')
         self.add_argument('--ind', type=bounded_num(int, imin=0), default=[0], nargs='+',
                           help='index for reconstruction to visualize and counterfact')
         self.add_argument('--gen', type=bounded_num(int, imin=0), default=0, help='Generate /number/ random samples)')
@@ -89,4 +89,3 @@ class SVCParser(CommonParser):
         super().__init__('SVC')
         self.add_argument('--kernel', type=str, default='rbf', choices=['linear', 'rbf', 'poly'], help='kernel SVC')
         self.add_argument('--C', type=bounded_num(float, imin=0), default=100, help='Regularization parameter')
-        self.add_argument('--eval', action='store_true', default=False, help='Evaluate the model)')

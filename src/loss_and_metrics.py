@@ -28,7 +28,7 @@ class MLPMetrics(MLPLoss):
                 }
 
 
-class ClassMetrics():
+class ClassMetrics:
 
     def __call__(self, targets, pred):
         conf_matrix = confusion_matrix(targets, pred)
@@ -38,8 +38,8 @@ class ClassMetrics():
         print()
         print(f'Accuracy: {(tn + tp) / (fn + fp + tn + tp):.2f}  '
               f'Specificity: {tn / (tn + fp):.2f}  Sensitivity: {tp / (fn + tp):.2f}')
-        print()
-        print(classification_report(targets, pred))
+        #print()
+        #print(classification_report(targets, pred))
 
 
 class AELoss:

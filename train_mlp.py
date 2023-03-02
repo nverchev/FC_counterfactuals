@@ -10,8 +10,8 @@ def main():
     args = Parser().parse_args()
     trainer = get_trainer(args)
     final = args.exp[:5] == 'final'
-    if args.pretrain:
-        ae_path_dir = os.path.join(args.data_dir, 'models', 'ae_' + args.exp)
+    if args.pretrain and args.load == -1:
+        ae_path_dir = os.path.join(args.data_dir, 'models', ('ae_' + args.exp).rstrip('_'))
         final_epoch = json.load(open(os.path.join(ae_path_dir, 'settings.json')))['training_epochs']
         ae_path = os.path.join(ae_path_dir, f'model_epoch{final_epoch}.pt')
         state = torch.load(ae_path, map_location=torch.device(trainer.device))
@@ -30,7 +30,7 @@ def main():
         metadata = pd.concat([train_metadata, test_metadata])
         metadata_pth = os.path.join(args.data_dir, 'metadata.csv')
         orig_metadata = pd.read_csv(metadata_pth)['file']
-        pd.merge(orig_metadata, metadata, on='file', validate='1:1').to_csv(metadata_pth)
+        pd.merge(orig_metadata, metadata, on='file', validate='1:1').to_csv(metadata_pth, index=False)
     else:
         trainer.test(partition='val', save_outputs=True)
 

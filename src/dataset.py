@@ -59,11 +59,12 @@ class EmptyDataset(Dataset):
 
 
 class FCSplitDataset(Dataset):
-    def __init__(self, metadata, data_dir, res, **dataset_settings):
+    def __init__(self, metadata, data_dir, res, cond='svc', **dataset_settings):
         self.metadata = metadata
         # TODO: use the same labels everywhere
         self.labels = metadata['label'].values - 1  # 1 -> 0, 2 -> 1
         self.matrices = np.zeros(shape=(len(self.labels), res * (res - 1) // 2))
+        self.condition = metadata[cond + '_prob'].values
         matrices_path = os.path.join(data_dir, 'corr_matrices_' + str(res))
         for idx, file in enumerate(self.metadata['file']):
             matrix = np.load(os.path.join(matrices_path, file + '.npy'))
@@ -77,7 +78,9 @@ class FCSplitDataset(Dataset):
     def __getitem__(self, idx):
         x = torch.from_numpy(self.matrices[idx]).float()
         label = torch.tensor([self.labels[idx]]).float()
-        return x, label, idx
+        condition = torch.tensor([self.condition[idx]]).float()
+
+        return [x, condition], label, idx
 
 
 class FCDataset:

@@ -349,6 +349,9 @@ class MLPTrainer(Trainer):
     def metrics(self, output, inputs, targets):
         return self._metrics(output, inputs, targets)
 
+    def helper_inputs(self, inputs, labels):
+        return {'x': inputs[0]}
+
     def test(self, partition, save_outputs=0, **kwargs):
         super().test(partition, save_outputs, **kwargs)
         if save_outputs:
@@ -377,6 +380,10 @@ class AETrainer(Trainer):
     def loss(self, output, inputs, targets):
         return self._loss(output, inputs, targets)
 
+    def helper_inputs(self, inputs, labels):
+        return {'x': inputs[0]}
+
+
 class VAETrainer(Trainer):
 
     def __init__(self, model, exp_name, block_args):
@@ -388,8 +395,7 @@ class VAETrainer(Trainer):
         return self._loss(output, inputs, targets)
 
     def helper_inputs(self, inputs, labels):
-        return {'x': inputs[0], 'condition': inputs[1], 'slice_n': inputs[2]}
-
+        return {'x': inputs[0], 'condition': inputs[1]}
 
     def viz_sample(self, ind):
         assert self.test_metadata.info, 'Need to test a dataset first'
