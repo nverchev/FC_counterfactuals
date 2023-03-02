@@ -10,7 +10,7 @@ from abc import ABCMeta, abstractmethod
 from collections import UserDict
 from src.dataset import get_loaders
 from src.models import get_model
-from src.loss_and_metrics import get_vae_loss, get_ae_loss, get_mlp_loss
+from src.loss_and_metrics import MLPLoss, AELoss, VAELoss, MLPMetrics, ClassMetrics
 from src.optim import get_opt, CosineSchedule
 
 
@@ -231,7 +231,7 @@ class Trainer(metaclass=ABCMeta):
             if save_outputs > (batch_idx + 1) * loader.batch_size:
                 self.test_outputs.extend_dict(self.recursive_to(outputs, 'detach_cpu'))
                 self.test_metadata.extend_dict(dict(indices=indices))
-                self.test_metadata.extend_dict(dict(targets=targets))
+                self.test_metadata.extend_dict(dict(targets=targets.cpu()))
         if torch.is_inference_mode_enabled():  # not averaged in batch
             self.saved_metrics = {metric: value / num_batch if metric == 'Criterion' else value / epoch_seen
                                   for metric, value in epoch_metrics.items()}
@@ -335,12 +335,53 @@ class Trainer(metaclass=ABCMeta):
         return paths
 
 
+class MLPTrainer(Trainer):
+
+    def __init__(self, model, exp_name, block_args):
+        super().__init__(model, exp_name, **block_args)
+        self._loss = MLPLoss()
+        self._metrics = MLPMetrics()
+        return
+
+    def loss(self, output, inputs, targets):
+        return self._loss(output, inputs, targets)
+
+    def metrics(self, output, inputs, targets):
+        return self._metrics(output, inputs, targets)
+
+    def test(self, partition, save_outputs=0, **kwargs):
+        super().test(partition, save_outputs, **kwargs)
+        if save_outputs:
+            pred = torch.stack(self.test_outputs['logits']) > 0
+            targets = torch.cat(self.test_metadata['targets'])
+            ClassMetrics()(targets, pred)
+        return
+
+    def update_metadata(self, partition, prob_name):
+        self.test(partition=partition, save_outputs=True)
+        loader = self.train_loader if partition == 'train' else self.test_loader
+        metadata = loader.dataset.metadata
+        indices = torch.stack(self.test_metadata['indices'])
+        probs = torch.sigmoid(torch.cat(self.test_outputs['logits']))
+        metadata[prob_name].values[indices] = probs
+        return metadata
+
+
+class AETrainer(Trainer):
+
+    def __init__(self, model, exp_name, block_args):
+        super().__init__(model, exp_name, **block_args)
+        self._loss = AELoss()
+        return
+
+    def loss(self, output, inputs, targets):
+        return self._loss(output, inputs, targets)
+
 class VAETrainer(Trainer):
 
     def __init__(self, model, exp_name, block_args):
         super().__init__(model, exp_name, **block_args)
-        self._loss = get_vae_loss(block_args)
-        self._metrics = self._loss
+        self._loss = VAELoss(block_args['c_reg'])
         return
 
     def loss(self, output, inputs, targets):
@@ -349,8 +390,6 @@ class VAETrainer(Trainer):
     def helper_inputs(self, inputs, labels):
         return {'x': inputs[0], 'condition': inputs[1], 'slice_n': inputs[2]}
 
-    def metrics(self, output, inputs, targets):
-        return self._metrics(output, inputs, targets)
 
     def viz_sample(self, ind):
         assert self.test_metadata.info, 'Need to test a dataset first'
@@ -429,45 +468,6 @@ class VAETrainer(Trainer):
             plt.imshow(img, cmap='gray', vmin=0, vmax=1)
             plt.savefig(os.path.join('images', name + "_" + str(ind)))
             plt.show()
-
-
-class MLPTrainer(Trainer):
-
-    def __init__(self, model, exp_name, block_args):
-        super().__init__(model, exp_name, **block_args)
-        self._loss = get_mlp_loss(block_args)
-        self._metrics = self._loss
-        return
-
-    def loss(self, output, inputs, targets):
-        return self._loss(output, inputs, targets)
-
-    def metrics(self, output, inputs, targets):
-        return self._metrics(output, inputs, targets)
-
-    def update_metadata(self, partition, prob_name):
-        self.test(partition=partition, save_outputs=True)
-        loader = self.train_loader if partition == 'train' else self.test_loader
-        metadata = loader.dataset.metadata
-        indices = torch.stack(self.test_metadata['indices'])
-        probs = torch.sigmoid(torch.cat(self.test_outputs['logits']))
-        metadata[prob_name].values[indices] = probs
-        return metadata
-
-
-class AETrainer(Trainer):
-
-    def __init__(self, model, exp_name, block_args):
-        super().__init__(model, exp_name, **block_args)
-        self._loss = get_ae_loss(block_args)
-        self._metrics = self._loss
-        return
-
-    def loss(self, output, inputs, targets):
-        return self._loss(output, inputs, targets)
-
-    def metrics(self, output, inputs, targets):
-        return self._metrics(output, inputs, targets)
 
 
 def get_trainer(args):

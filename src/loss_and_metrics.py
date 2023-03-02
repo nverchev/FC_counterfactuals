@@ -1,41 +1,78 @@
+import pandas as pd
 import torch
 import torch.nn.functional as F
-import numpy as np
+from sklearn.metrics import confusion_matrix, classification_report, ConfusionMatrixDisplay
+
+
+class MLPLoss:
+
+    def __init__(self):
+        self.ce = torch.nn.BCEWithLogitsLoss(reduction='none')
+
+    def __call__(self, outputs, inputs, targets):
+        logits = outputs['logits']
+        ce = self.ce(logits, targets)
+        return {'Criterion': ce.mean(),
+                'CE': ce.sum(),
+                }
+
+
+class MLPMetrics(MLPLoss):
+
+    def __call__(self, outputs, inputs, targets):
+        prediction = outputs['logits'] > 0
+        correct = prediction == targets
+        ce = super().__call__(outputs, inputs, targets)['CE']
+        return {'Accuracy': correct.sum(),
+                'CE': ce,
+                }
+
+
+class ClassMetrics():
+
+    def __call__(self, targets, pred):
+        conf_matrix = confusion_matrix(targets, pred)
+        print()
+        print(pd.DataFrame(conf_matrix, columns=('Pred Neg', 'Pred Pos'), index=('Neg', 'Pos')))
+        tn, fp, fn, tp = conf_matrix.ravel()
+        print()
+        print(f'Accuracy: {(tn + tp) / (fn + fp + tn + tp):.2f}  '
+              f'Specificity: {tn / (tn + fp):.2f}  Sensitivity: {tp / (fn + tp):.2f}')
+        print()
+        print(classification_report(targets, pred))
+
+
+class AELoss:
+
+    def __init__(self):
+        self.se = torch.nn.MSELoss(reduction='none')
+
+    def __call__(self, outputs, inputs, targets):
+        recon = outputs['recon']
+        mse = self.se(recon, inputs).mean(1)
+        return {'Criterion': mse.mean(),
+                'MSE': mse.sum(),
+                }
 
 
 class VAELoss:
 
     def __init__(self, c_reg):
+        super().__init__()
         self.c_reg = c_reg
-        self.train_var = None  # calculated variance
-        self.train_logvar = None  # calculated log variance
-        self.adj_nll = 0.5 * np.log(2 * np.pi)  # adjustment to calculate the NLL
+        self.se = torch.nn.MSELoss(reduction='none')
         self.scale_prior = 1
 
     def __call__(self, outputs, inputs, targets):
         inputs = inputs[0]
         kld, kld_real = self.kld_loss(inputs, outputs, targets)
-        NLL, MSE = self.nll_loss(inputs, outputs['recon'])
-        return {'Criterion': MSE.mean() + self.c_reg * kld.mean(),
-                'real_loss': NLL + kld_real.sum(),
-                'KLD_Smooth': kld.sum(),
+        recon = outputs['recon']
+        mse = self.se(recon, inputs).mean(1)
+        return {'Criterion': mse.mean() + self.c_reg * kld.mean(),
+                'KLD Smooth': kld.sum(),
                 'KLD': kld_real.sum(),
-                'NLL': NLL,
-                'MSE': MSE.sum(),
+                'MSE': mse.sum(),
                 }
-
-    def nll_loss(self, inputs, recon):
-        SE = F.mse_loss(recon, inputs, reduction='none')
-        if self.train_var is None:
-            self.train_var = SE.mean(0).detach()
-            self.train_logvar = torch.log(self.train_var)
-        local_device = recon.device  # makes sure you can change device during training
-        train_var, train_logvar = self.train_var.to(local_device), self.train_logvar.to(local_device)
-        NLL = 0.5 * (SE / train_var + train_logvar).sum() + self.adj_nll * recon.numel()
-        if recon.requires_grad:
-            self.train_var = 0.9 * train_var + 0.1 * SE.mean(0).detach()
-            self.train_logvar = torch.log(self.train_var)
-        return NLL, SE.sum([1, 2, 3])
 
     def kld_loss(self, inputs, outputs, targets, freebits=0):
         prior_mu = self.condition(inputs, outputs, targets)
@@ -65,42 +102,3 @@ class VAEXLoss(VAELoss):
         conditional = torch.zeros_like(outputs['mu'][0])
         conditional[:, :1, ...] = probs.view(-1, 1, 1, 1) * self.scale_prior
         return conditional
-
-
-class MLPLoss:
-
-    def __init__(self):
-        self.ce = torch.nn.BCEWithLogitsLoss(reduction='none')
-
-    def __call__(self, outputs, inputs, targets):
-        logits = outputs['logits']
-        CE = self.ce(logits, targets)
-        return {'Criterion': CE.mean(),
-                'CE': CE.sum(),
-                }
-
-
-class AELoss:
-
-    def __init__(self):
-        self.se = torch.nn.MSELoss(reduction='none')
-
-    def __call__(self, outputs, inputs, targets):
-        recon = outputs['recon']
-        SE = self.se(recon, inputs)
-        return {'Criterion': SE.mean(),
-                'MCE': SE.sum(),
-                }
-
-
-def get_vae_loss(settings):
-    c_reg = settings['c_reg']
-    return VAEXLoss(c_reg=c_reg)
-
-
-def get_mlp_loss(settings):
-    return MLPLoss()
-
-
-def get_ae_loss(settings):
-    return AELoss()
