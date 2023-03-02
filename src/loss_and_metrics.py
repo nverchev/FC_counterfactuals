@@ -49,7 +49,7 @@ class AELoss:
 
     def __call__(self, outputs, inputs, targets):
         recon = outputs['recon']
-        mse = self.se(recon, inputs).mean(1)
+        mse = self.se(recon, inputs[0]).mean(1)
         return {'Criterion': mse.mean(),
                 'MSE': mse.sum(),
                 }
@@ -80,15 +80,15 @@ class VAELoss:
         q_logvar = outputs['log_var'][0]
         kld_matrix = -1 - q_logvar + (q_mu - prior_mu) ** 2 + q_logvar.exp()
         kld_free_bits = F.softplus(kld_matrix - 2 * freebits) + 2 * freebits
-        kld = 0.5 * kld_free_bits.sum((1, 2, 3))
-        kld_real = 0.5 * kld_matrix.sum((1, 2, 3))
+        kld = 0.5 * kld_free_bits.sum(1)
+        kld_real = 0.5 * kld_matrix.sum(1)
         for d_mu, d_logvar, p_logvar in zip(outputs['mu'][1:], outputs['log_var'][1:], outputs['prior_log_var']):
             # d_mu = q_mu - p_mu
             # d_logvar = q_logvar - p_logvar
             kld_matrix = -1 - d_logvar + d_logvar.exp() + (d_mu ** 2) / p_logvar.exp()
             kld_free_bits = F.softplus(kld_matrix - 2 * freebits) + 2 * freebits
-            kld += 0.5 * kld_free_bits.sum((1, 2, 3))
-            kld_real += 0.5 * kld_matrix.sum((1, 2, 3))
+            kld += 0.5 * kld_free_bits.sum(1)
+            kld_real += 0.5 * kld_matrix.sum(1)
         return kld, kld_real
 
     def condition(self, inputs, outputs, targets):

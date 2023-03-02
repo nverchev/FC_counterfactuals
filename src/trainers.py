@@ -395,7 +395,7 @@ class VAETrainer(Trainer):
         return self._loss(output, inputs, targets)
 
     def helper_inputs(self, inputs, labels):
-        return {'x': inputs[0], 'condition': inputs[1]}
+        return {'x': inputs[0]}
 
     def viz_sample(self, ind):
         assert self.test_metadata.info, 'Need to test a dataset first'
@@ -497,7 +497,8 @@ def get_trainer(args):
         data_dir=args.data_dir,
         schedule=CosineSchedule(decay_steps=args.decay_period, min_decay=args.min_decay),
     )
-    exp_name = '_'.join(args.name.lower().split(' ') + ['pretrain' * args.pretrain, args.exp]).strip('_')
+
+    exp_name = '_'.join(args.name.lower().split(' ') + [args.exp]).strip('_')
 
     trainer_mapping = {
         'AE': AETrainer,

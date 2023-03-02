@@ -22,7 +22,7 @@ def bounded_num(numeric_type, imin=None, imax=None):
 
 class CommonParser(argparse.ArgumentParser):
     # Defaults of specific Parser
-    _defaults = {}
+    default_values = {}
 
     def __init__(self, name):
         super().__init__(name)
@@ -35,13 +35,13 @@ class CommonParser(argparse.ArgumentParser):
                           help='SGD_momentum has momentum = 0.9')
         self.add_argument('--lr', type=bounded_num(float, imin=0), default=0.001, help='Learning rate')
         self.add_argument('--wd', type=bounded_num(float, imin=0), default=0.00001, help='Weight decay')
-        self.add_argument('--c_reg', type=bounded_num(float, imin=0), default=0.05,
+        self.add_argument('--c_reg', type=bounded_num(float, imin=0), default=0.5,
                           help='Coefficient for regularization')
         self.add_argument('--epochs', type=bounded_num(int, imin=1), default=350,
                           help='Number of total training epochs')
         self.add_argument('--decay_period', type=bounded_num(int, imin=0), default=250,
                           help='Number of epochs before lr decays stops')
-        self.add_argument('--min_decay', type=bounded_num(float, imin=0), default=0.01,
+        self.add_argument('--min_decay', type=bounded_num(float, imin=0), default=1,
                           help='fraction of the initial lr at the end of train')
         self.add_argument('--checkpoint', type=bounded_num(int, imin=1), default=10,
                           help='Number of epochs between checkpoints')
@@ -51,16 +51,14 @@ class CommonParser(argparse.ArgumentParser):
                                '0 for most recent, otherwise epoch after which the model was saved')
         self.add_argument('--eval', action='store_true', default=False, help='Evaluate the model)')
         self.add_argument('--seed', type=bounded_num(int, imin=1), default=0, help='Torch/Numpy seed (0 no seed)')
-
+        self.set_defaults(name=name, **self.default_values)
         if os.path.exists('dataset_path.txt'):
             with open('dataset_path.txt', 'r') as f:
                 self.set_defaults(data_dir=f.read())
-        self.set_defaults(name=name, **self._defaults)
 
 
 class MainParser(CommonParser):
-    _defaults = {'lr': 0.01,
-                 'min_decay': 0.01}
+    default_values = {'lr': 0.0001}
 
     def __init__(self):
         super().__init__('Counterfactual VAE')
@@ -78,6 +76,7 @@ class MLPParser(CommonParser):
 
 
 class AEParser(CommonParser):
+    default_values = {'lr': 0.0001}
 
     def __init__(self):
         super().__init__('AE')

@@ -6,7 +6,7 @@ def main():
     args = Parser().parse_args()
     trainer = get_trainer(args)
     final = args.exp[:5] == 'final'
-    if args.n_gen:
+    if args.gen:
         trainer.generate_samples(args.n_gen)
     if not args.eval:
         while args.epochs > trainer.epoch:

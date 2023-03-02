@@ -8,10 +8,13 @@ from src.trainers import get_trainer
 
 def main():
     args = Parser().parse_args()
+    exp = args.exp
+    if args.pretrain:
+        args.exp = 'pretrain_' + exp
     trainer = get_trainer(args)
     final = args.exp[:5] == 'final'
     if args.pretrain and args.load == -1:
-        ae_path_dir = os.path.join(args.data_dir, 'models', ('ae_' + args.exp).rstrip('_'))
+        ae_path_dir = os.path.join(args.data_dir, 'models', ('ae_' + exp).rstrip('_'))
         final_epoch = json.load(open(os.path.join(ae_path_dir, 'settings.json')))['training_epochs']
         ae_path = os.path.join(ae_path_dir, f'model_epoch{final_epoch}.pt')
         state = torch.load(ae_path, map_location=torch.device(trainer.device))
