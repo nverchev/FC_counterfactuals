@@ -228,7 +228,7 @@ class VAEX(AbstractVAE):
         data['z'].append(z)
         return data
 
-    def decoder(self, data, condition, slice_n: torch.Tensor, sample=None, s=1):
+    def decoder(self, data, condition, slice_n, sample=None, s=1):
         data['prior_mu'] = []
         data['prior_log_var'] = []
         data['condition'] = condition

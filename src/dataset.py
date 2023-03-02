@@ -14,9 +14,18 @@ def fetch_preprocess(data_dir, res):
         os.mkdir(data_dir)
         dataset = datasets.fetch_abide_pcp(data_dir=data_dir, legacy_format=False)
         metadata_df = pd.read_csv(os.path.join(data_dir, 'ABIDE_pcp', 'Phenotypic_V1_0b_preprocessed1.csv'))
+        quality_checks = [
+            metadata_df['qc_rater_1'] == 'OK',
+            metadata_df['qc_anat_rater_2'].isin(['OK', 'maybe']),
+            metadata_df['qc_func_rater_2'].isin(['OK', 'maybe']),
+            metadata_df['qc_anat_rater_3'] == 'OK',
+            metadata_df['qc_func_rater_3'] == 'OK'
+        ]
+        metadata_df = metadata_df.loc[np.logical_and.reduce(quality_checks)]
         metadata_df = metadata_df[['FILE_ID', 'DX_GROUP']].rename(columns={'FILE_ID': 'file', 'DX_GROUP': 'label'})
         metadata_df['svc_prob'] = metadata_df['mlp_prob'] = metadata_df['ae_prob'] = np.nan
         metadata_df.to_csv(os.path.join(data_dir, 'metadata.csv'))
+
 
     corr_dir = os.path.join(data_dir, 'corr_matrices_' + str(res))
     if not os.path.exists(corr_dir):
