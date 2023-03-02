@@ -11,7 +11,7 @@ def main():
     trainer = get_trainer(args)
     final = args.exp[:5] == 'final'
     if args.pretrain:
-        ae_path_dir = os.path.join(args.data_dir, 'models', 'ae' + trainer.exp_name[3:])
+        ae_path_dir = os.path.join(args.data_dir, 'models', 'ae_' + args.exp)
         final_epoch = json.load(open(os.path.join(ae_path_dir, 'settings.json')))['training_epochs']
         ae_path = os.path.join(ae_path_dir, f'model_epoch{final_epoch}.pt')
         state = torch.load(ae_path, map_location=torch.device(trainer.device))

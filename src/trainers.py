@@ -491,7 +491,7 @@ def get_trainer(args):
         data_dir=args.data_dir,
         schedule=CosineSchedule(decay_steps=args.decay_period, min_decay=args.min_decay),
     )
-    exp_name = '_'.join(args.name.lower().split(' ') + [args.exp]).strip('_')
+    exp_name = '_'.join(args.name.lower().split(' ') + ['pretrain' * args.pretrain, args.exp]).strip('_')
 
     trainer_mapping = {
         'AE': AETrainer,
