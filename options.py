@@ -41,7 +41,7 @@ class CommonParser(argparse.ArgumentParser):
                           help='Number of total training epochs')
         self.add_argument('--decay_period', type=bounded_num(int, imin=0), default=250,
                           help='Number of epochs before lr decays stops')
-        self.add_argument('--min_decay', type=bounded_num(float, imin=0), default=1,
+        self.add_argument('--min_decay', type=bounded_num(float, imin=0), default=0.01,
                           help='fraction of the initial lr at the end of train')
         self.add_argument('--checkpoint', type=bounded_num(int, imin=1), default=10,
                           help='Number of epochs between checkpoints')

@@ -12,9 +12,6 @@ train_loader, val_loader, test_loader = get_loaders(**vars(args))
 train_data = train_loader.dataset.matrices
 train_labels = train_loader.dataset.labels
 train_metadata = train_loader.dataset.metadata
-test_data = test_loader.dataset.matrices
-test_labels = test_loader.dataset.labels
-test_metadata = test_loader.dataset.metadata
 final = args.exp[:5] == 'final'
 model_path = os.path.join(args.data_dir, 'models', (args.name.lower() + '_' + args.exp).rstrip('_') + '.joblib')
 model = SVC(kernel=args.kernel, C=args.C, gamma='auto', random_state=args.seed, probability=True)
@@ -30,6 +27,9 @@ if not final:
     for i, score in enumerate(scores):
         print(f'Section {i} accuracy: {score:.2f}')
 else:
+    test_data = test_loader.dataset.matrices
+    test_labels = test_loader.dataset.labels
+    test_metadata = test_loader.dataset.metadata
     pred = model.predict(test_data)
     ClassMetrics()(test_labels, pred)
     train_metadata['svc_prob'] = model.predict_proba(train_data)[:, 1]

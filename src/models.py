@@ -17,6 +17,7 @@ class MLP(nn.Module):
         for in_features, out_features in zip(layers[:-1], layers[1:]):
             hidden_layers.append(nn.Linear(in_features, out_features))
             hidden_layers.append(nn.ReLU())
+            hidden_layers.append(nn.Dropout(0.2))
         self.encode = nn.Sequential(*hidden_layers)
         self.classifier = nn.Linear(layers[-1], 1)
         self.settings = dict(hidden_layers=layers)
@@ -123,35 +124,6 @@ class AbstractVAE(nn.Module, metaclass=ABCMeta):
         print(new_dims, '=', total)
         return
 
-    def size_calc(self):
-        l_dims = self.x_dim
-        l_dims_encoder = [l_dims]
-        for k_dim, stride, padding in zip(self.k_dims, self.strides, self.paddings):
-            l_dims = self.conv_size_calc(L_in=l_dims, kernel_size=k_dim, stride=stride, padding=padding)
-            l_dims_encoder.append(l_dims)
-        final_z_res = self.conv_size_calc(L_in=l_dims, kernel_size=3, stride=2, padding=1)
-        l_dims_decoder = [l_dims]
-        for k_dim, stride, padding in reversed_zip(self.k_dims, self.strides, self.paddings):
-            l_dims = self.transposed_conv_size_calc(L_in=l_dims, kernel_size=k_dim, stride=stride, padding=padding)
-            l_dims_decoder.append(l_dims)
-        assert l_dims == self.x_dim
-        return l_dims_encoder, l_dims_decoder, final_z_res
-
-    def print_sizes(self):
-        print('Block Sizes:')
-        for i, (h, l) in enumerate(zip(self.h_dims, self.l_dims_encoder)):
-            print('Block {} size: None x {} x {} x {}'.format(i + 1, h, l, l))
-
-        for i, (h, l) in enumerate(zip(self.h_dims[::-1], self.l_dims_decoder)):
-            print('Block {} size: None x {} x {} x {}'.format(len(self.h_dims) + 1 + i, h, l, l))
-
-    @staticmethod
-    def conv_size_calc(L_in, kernel_size, stride=1, dilation=1, padding=0):
-        return int((L_in + 2 * padding - dilation * (kernel_size - 1) - 1) // stride) + 1
-
-    @staticmethod
-    def transposed_conv_size_calc(L_in, kernel_size, stride=1, padding=0, dilation=1, output_padding=0):
-        return (L_in - 1) * stride - 2 * padding + dilation * (kernel_size - 1) + output_padding + 1
 
 
 class VAEX(AbstractVAE):
