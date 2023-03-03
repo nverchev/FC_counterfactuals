@@ -52,7 +52,7 @@ class CommonParser(argparse.ArgumentParser):
         self.add_argument('--seed', type=bounded_num(int, imin=1), default=0, help='Torch/Numpy seed (0 no seed)')
         self.add_argument('--ind', type=bounded_num(int, imin=0), default=[0], nargs='+',
                           help='index for reconstruction to visualize and counterfact')
-        self.add_argument('--c_reg', type=bounded_num(float, imin=0), default=0.00001,
+        self.add_argument('--c_reg', type=bounded_num(float, imin=0), default=0.00005,
                           help='Coefficient for regularization')
         self.set_defaults(name=name, **self.default_values)
         if os.path.exists('dataset_path.txt'):

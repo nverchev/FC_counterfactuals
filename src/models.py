@@ -86,9 +86,8 @@ class VAEX(VAE):
         self.generate = nn.ModuleList([])
         self.from_latent = nn.ModuleList([])
         for features in reversed(self.h_dims[1:-1]):
-            self.inference.append(nn.Linear(2 * features, 4 * z_dim))
-            self.generate.append(nn.Linear(features + z_dim, 4 * z_dim))
-            z_dim *= 2
+            self.inference.append(nn.Linear(2 * features, 2 * z_dim))
+            self.generate.append(nn.Linear(features + z_dim, 2 * z_dim))
             self.from_latent.append(nn.Linear(features + z_dim + dim_condition, features))
 
     def encoder(self, x, condition):
@@ -111,6 +110,7 @@ class VAEX(VAE):
     def decoder(self, data, condition, sample=None, s=1):
         data['prior_mu'] = []
         data['prior_log_var'] = []
+        data['condition'] = condition
         z = data['z'].pop() if sample is None else sample
         x = torch.cat([z, condition], dim=1)
         for decode, from_latent, generate, inference in \

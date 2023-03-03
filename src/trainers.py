@@ -10,7 +10,7 @@ from abc import ABCMeta, abstractmethod
 from collections import UserDict
 from src.dataset import get_loaders
 from src.models import get_model
-from src.loss_and_metrics import MLPLoss, AELoss, VAELoss, MLPMetrics, ClassMetrics
+from src.loss_and_metrics import MLPLoss, AELoss, VAEXLoss, MLPMetrics, ClassMetrics
 from src.optim import get_opt, CosineSchedule
 
 
@@ -419,7 +419,7 @@ class VAETrainer(AETrainer):
 
     def __init__(self, model, exp_name, block_args):
         super().__init__(model, exp_name, block_args)
-        self._loss = VAELoss(block_args['c_reg'])
+        self._loss = VAEXLoss(block_args['c_reg'])
         return
 
     @torch.inference_mode()
@@ -427,6 +427,7 @@ class VAETrainer(AETrainer):
         sample = torch.randn(n_samples, self.model.z_dim, device=self.device).repeat_interleave(2, dim=0)
         condition = torch.zeros((n_samples, 1), device=self.device)
         condition = torch.cat((condition, torch.ones_like(condition)), dim=1).view(2 * n_samples, 1)
+        sample[:, :1] = condition
         self.model.eval()
         gen_samples = self.model.decoder(data={}, sample=sample, condition=condition)
         gen_samples = gen_samples['recon'].cpu()
@@ -443,7 +444,7 @@ class VAETrainer(AETrainer):
         plt.close(fig)
 
     @torch.inference_mode()
-    def generate_counterfactuals(self, ind, counterfactual_prob=None, s=0.8):
+    def generate_counterfactuals(self, ind, counterfactual_prob=None, s=0):
         part = self.test_metadata.info['partition']
         loader = self.test_loader if part == 'test' else self.val_loader if part == 'val' else self.train_loader
         metadata = self.test_metadata[ind]
@@ -451,19 +452,21 @@ class VAETrainer(AETrainer):
         [orig, prob], label, _ = loader.dataset[index]
 
         counterfactual_prob = np.round(prob < 0.5) if counterfactual_prob is None else counterfactual_prob
-        print('Label: ', label, " -  Associated probability: ", prob,
-              " - Counterfactual probability: ", counterfactual_prob)
+        print(f'Label: {label.item():.3f} -  Associated probability: {prob.item():.3f} -  '
+              f'Counterfactual probability: {counterfactual_prob.item():.3f}')
         self.model.eval()
         [orig, prob] = self.recursive_to([orig, prob], self.device)
         data = self.model.encoder(orig.unsqueeze(0), prob.unsqueeze(0))
         data_copy = {k: apply(v, check=torch.is_tensor, f=lambda x: x.clone()) for k, v in data.items()}
-        gen_samples_rec = self.model.decoder(data=data,
+        data_copy['z'][-1][:, -1] = counterfactual_prob * self._loss.scale_prior
+        gen_samples_con = self.model.decoder(data=data, condition=torch.tensor([[prob]], device=self.device), s=s)
+        gen_samples_con = gen_samples_con['recon'].cpu()[0]
+        gen_samples_rec = self.model.decoder(data=data_copy,
                                              condition=torch.tensor([[counterfactual_prob]], device=self.device), s=s)
         gen_samples_rec = gen_samples_rec['recon'].cpu()[0]
-        # orig_data['z'][-1][:, :1, ...] = condition.view(-1, 1, 1, 1) * self._loss.scale_prior
-        gen_samples_con = self.model.decoder(data=data_copy, condition=torch.tensor([[prob]], device=self.device), s=s)
-        gen_samples_con = gen_samples_con['recon'].cpu()[0]
+
         orig = orig.cpu()
+        print((- gen_samples_rec + gen_samples_con).mean())
         counterfactual = torch.clip(orig - gen_samples_rec + gen_samples_con, min=0, max=1)
         if not os.path.exists('images'):
             os.mkdir('images')

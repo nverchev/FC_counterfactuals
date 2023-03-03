@@ -100,5 +100,5 @@ class VAEXLoss(VAELoss):
     def condition(self, inputs, outputs, targets):
         probs = outputs['condition'].squeeze()
         conditional = torch.zeros_like(outputs['mu'][0])
-        conditional[:, :1, ...] = probs.view(-1, 1, 1, 1) * self.scale_prior
+        conditional[:, :1] = probs.view(-1, 1) * self.scale_prior
         return conditional
