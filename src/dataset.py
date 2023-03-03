@@ -65,6 +65,7 @@ class FCSplitDataset(Dataset):
         self.labels = metadata['label'].values - 1  # 1 -> 0, 2 -> 1
         self.matrices = np.zeros(shape=(len(self.labels), res * (res - 1) // 2))
         self.condition = metadata[cond + '_prob'].values
+        self.res = res
         matrices_path = os.path.join(data_dir, 'corr_matrices_' + str(res))
         for idx, file in enumerate(self.metadata['file']):
             matrix = np.load(os.path.join(matrices_path, file + '.npy'))

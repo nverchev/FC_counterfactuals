@@ -14,10 +14,10 @@ def main():
             trainer.save()
             if not final:
                 trainer.test('val')
-    trainer.test('test' if final else 'val')
+    trainer.test('test' if final else 'val', save_outputs=args.ind)
     for i in args.ind:
         trainer.viz_sample(i)
-        trainer.generate_counterfactuals(i)
+        #trainer.generate_counterfactuals(i)
 
 
 if __name__ == '__main__':

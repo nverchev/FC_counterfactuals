@@ -381,38 +381,45 @@ class AETrainer(Trainer):
         return self._loss(output, inputs, targets)
 
     def helper_inputs(self, inputs, labels):
-        return {'x': inputs[0]}
-
-
-class VAETrainer(Trainer):
-
-    def __init__(self, model, exp_name, block_args):
-        super().__init__(model, exp_name, **block_args)
-        self._loss = VAELoss(block_args['c_reg'])
-        return
-
-    def loss(self, output, inputs, targets):
-        return self._loss(output, inputs, targets)
-
-    def helper_inputs(self, inputs, labels):
-        return {'x': inputs[0]}
+        return {'x': inputs[0], 'condition': inputs[1]}
 
     def viz_sample(self, ind):
-        assert self.test_metadata.info, 'Need to test a dataset first'
+        assert self.test_metadata is not None, 'Need to test a dataset first'
         part = self.test_metadata.info['partition']
         loader = self.test_loader if part == 'test' else self.val_loader if part == 'val' else self.train_loader
         metadata = self.test_metadata[ind]
         index = metadata['indices']
-        [orig, prob, _], label, _ = loader.dataset[index]
-        print('Label: ', label, " -  Associated probability: ", prob)
-        recon = self.test_outputs[ind]['recon'].squeeze(0)
+        [orig, prob], label, _ = loader.dataset[index]
+        orig_data = self.test_outputs[ind]
+        mse = self.metrics(orig_data, [orig.unsqueeze(0), prob.unsqueeze(0)], label)['MSE']
+        print(f'Label: {label.item():.3f} -  Associated probability: {prob.item():.3f} -  MSE: {mse.item():.3f}')
+        recon = orig_data['recon'].squeeze(0)
         if not os.path.exists('images'):
             os.mkdir('images')
-        for name, img in {'original': orig, 'reconstruction': recon}.items():
-            img = np.array(img[0], dtype=float).transpose()[::-1]
-            plt.imshow(img, cmap='gray', vmin=0, vmax=1)
+        for name, features in {'original': orig, 'reconstruction': recon}.items():
+            img = self.matrix_from_feature(loader.dataset.res, features)
+            plt.imshow(img, cmap='coolwarm')
             plt.savefig(os.path.join('images', name + "_" + str(ind)))
             plt.show()
+
+    @staticmethod
+    def matrix_from_feature(res, features):
+        matrix = np.zeros((res, res))
+        matrix[np.triu_indices(res, k=1)] = features
+        matrix += matrix.transpose()
+        matrix[np.diag_indices(res)] = 1
+        return matrix
+
+
+
+
+
+class VAETrainer(AETrainer):
+
+    def __init__(self, model, exp_name, block_args):
+        super().__init__(model, exp_name, block_args)
+        self._loss = VAELoss(block_args['c_reg'])
+        return
 
     @torch.inference_mode()
     def generate_samples(self, batch_size, condition=0.):
@@ -451,6 +458,7 @@ class VAETrainer(Trainer):
         print('Label: ', label, " -  Associated probability: ", prob,
               " - Counterfactual probability: ", counterfactual_prob)
         orig_data = self.test_outputs[ind]
+        self.metrics(orig_data, [orig, prob], label)
         condition = 2 * counterfactual_prob * torch.ones((1, 1, 1, 1), device=self.device) - 1
         self.model.eval()
         orig_data = self.recursive_to(orig_data, self.device)
@@ -493,7 +501,6 @@ def get_trainer(args):
         device=device,
         batch_size=args.batch_size,
         training_epochs=args.epochs,
-        c_reg=args.c_reg,
         data_dir=args.data_dir,
         schedule=CosineSchedule(decay_steps=args.decay_period, min_decay=args.min_decay),
     )

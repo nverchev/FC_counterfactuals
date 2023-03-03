@@ -14,7 +14,8 @@ def main():
                 trainer.test('val')
     else:
         trainer.test('test' if final else 'val')
-
+    for i in args.ind:
+        trainer.viz_sample(i)
 
 if __name__ == '__main__':
     main()

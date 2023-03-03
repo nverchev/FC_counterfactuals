@@ -35,8 +35,7 @@ class CommonParser(argparse.ArgumentParser):
                           help='SGD_momentum has momentum = 0.9')
         self.add_argument('--lr', type=bounded_num(float, imin=0), default=0.001, help='Learning rate')
         self.add_argument('--wd', type=bounded_num(float, imin=0), default=0.00001, help='Weight decay')
-        self.add_argument('--c_reg', type=bounded_num(float, imin=0), default=0.5,
-                          help='Coefficient for regularization')
+
         self.add_argument('--epochs', type=bounded_num(int, imin=1), default=350,
                           help='Number of total training epochs')
         self.add_argument('--decay_period', type=bounded_num(int, imin=0), default=250,
@@ -51,6 +50,8 @@ class CommonParser(argparse.ArgumentParser):
                                '0 for most recent, otherwise epoch after which the model was saved')
         self.add_argument('--eval', action='store_true', default=False, help='Evaluate the model)')
         self.add_argument('--seed', type=bounded_num(int, imin=1), default=0, help='Torch/Numpy seed (0 no seed)')
+        self.add_argument('--ind', type=bounded_num(int, imin=0), default=[0], nargs='+',
+                          help='index for reconstruction to visualize and counterfact')
         self.set_defaults(name=name, **self.default_values)
         if os.path.exists('dataset_path.txt'):
             with open('dataset_path.txt', 'r') as f:
@@ -58,15 +59,15 @@ class CommonParser(argparse.ArgumentParser):
 
 
 class MainParser(CommonParser):
-    default_values = {'lr': 0.0001}
+    default_values = {'lr': 0.0001, 'res': 122}
 
     def __init__(self):
         super().__init__('Counterfactual VAE')
         self.add_argument('--cond', choices=['svc', 'mlp', 'ae'], default='svc', help='Evaluate the model)')
-        self.add_argument('--ind', type=bounded_num(int, imin=0), default=[0], nargs='+',
-                          help='index for reconstruction to visualize and counterfact')
-        self.add_argument('--gen', type=bounded_num(int, imin=0), default=0, help='Generate /number/ random samples)')
 
+        self.add_argument('--gen', type=bounded_num(int, imin=0), default=0, help='Generate /number/ random samples)')
+        self.add_argument('--c_reg', type=bounded_num(float, imin=0), default=0.00001,
+                          help='Coefficient for regularization')
 
 class MLPParser(CommonParser):
 
