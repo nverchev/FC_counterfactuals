@@ -12,8 +12,7 @@ def main():
             trainer.save()
             if not final:
                 trainer.test('val')
-    else:
-        trainer.test('test' if final else 'val')
+    trainer.test('test' if final else 'val', save_outputs=args.ind)
     for i in args.ind:
         trainer.viz_sample(i)
 

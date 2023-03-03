@@ -14,7 +14,7 @@ class MLP(nn.Module):
 
     def __init__(self, x_dim, z_dim):
         super().__init__()
-        self.h_dims = [x_dim, 1024, 256, z_dim]
+        self.h_dims = [x_dim, 512, 256, z_dim]
         self.encode = nn.ModuleList([])
         for in_features, out_features in zip(self.h_dims[:-2], self.h_dims[1:-1]):
             self.encode.append(get_linear_layer(in_features, out_features, drop_out=0.2))
@@ -34,6 +34,7 @@ class AE(MLP):
     def __init__(self, x_dim, z_dim, dim_condition=0, vae=False):
         super().__init__(x_dim + dim_condition, 2 * z_dim if vae else z_dim)
         self.x_dim = x_dim
+        self.z_dim = z_dim
         self.h_dims[-1] = z_dim + dim_condition  # overwritten when calling the vae
         self.decode = nn.ModuleList([])
         for in_features, out_features in reversed_zip(self.h_dims[2:], self.h_dims[1:-1]):
@@ -85,9 +86,10 @@ class VAEX(VAE):
         self.generate = nn.ModuleList([])
         self.from_latent = nn.ModuleList([])
         for features in reversed(self.h_dims[1:-1]):
+            self.inference.append(nn.Linear(2 * features, 4 * z_dim))
+            self.generate.append(nn.Linear(features + z_dim, 4 * z_dim))
+            z_dim *= 2
             self.from_latent.append(nn.Linear(features + z_dim + dim_condition, features))
-            self.inference.append(nn.Linear(2 * features, 2 * z_dim))
-            self.generate.append(nn.Linear(features + z_dim, 2 * z_dim))
 
     def encoder(self, x, condition):
         data = {'hidden': [],

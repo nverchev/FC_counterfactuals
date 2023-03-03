@@ -396,11 +396,15 @@ class AETrainer(Trainer):
         recon = orig_data['recon'].squeeze(0)
         if not os.path.exists('images'):
             os.mkdir('images')
-        for name, features in {'original': orig, 'reconstruction': recon}.items():
+        fig, subplots = plt.subplots(1, 2)
+        for ind, (name, features) in enumerate({'Original': orig, 'Reconstruction': recon}.items()):
+            ax = subplots[ind]
             img = self.matrix_from_feature(loader.dataset.res, features)
-            plt.imshow(img, cmap='coolwarm')
-            plt.savefig(os.path.join('images', name + "_" + str(ind)))
-            plt.show()
+            ax.imshow(img, cmap='coolwarm', vmin=-1, vmax=1)
+            ax.set_title(name)
+            if ind == 1:
+                fig.savefig(os.path.join('images', 'reconstruction_' + str(ind // 2)))
+                plt.show()
 
     @staticmethod
     def matrix_from_feature(res, features):
@@ -411,9 +415,6 @@ class AETrainer(Trainer):
         return matrix
 
 
-
-
-
 class VAETrainer(AETrainer):
 
     def __init__(self, model, exp_name, block_args):
@@ -422,29 +423,25 @@ class VAETrainer(AETrainer):
         return
 
     @torch.inference_mode()
-    def generate_samples(self, batch_size, condition=0.):
-        z_final_dim = self.model.z_dims[-1] * self.model.final_z_res ** 2
-        sample = torch.randn(batch_size // 2, z_final_dim).repeat_interleave(2, dim=0)
-        sample = sample.to(self.device) / 5
-        condition = torch.zeros((batch_size // 2, 1), device=self.device)
-        condition = torch.cat((condition, torch.ones_like(condition)), dim=1).view(batch_size, 1, 1, 1)
-        condition = 2 * condition - 1
-
-        slice_n = torch.full((batch_size, 1, 1, 1), 1.0, device=self.device)
-        # self.model.eval()
-        # sample = torch.randn(1, z_final_dim).repeat(10, 1)
-        # sample = sample.to(self.device)
-        # condition = 2 * torch.ones((10, 1, 1, 1), device=self.device) - 1
-        # slice_n = torch.arange(start=50, end=150, step=10, device=self.device)
-        # slice_n = (slice_n / 100 - 1).view(-1, 1, 1, 1)
-
-        gen_samples = self.model.decoder(data={'hidden': []}, sample=sample, condition=condition, slice_n=slice_n)
+    def generate_samples(self, n_samples, condition=0.):
+        sample = torch.randn(n_samples, self.model.z_dim, device=self.device).repeat_interleave(2, dim=0)
+        condition = torch.zeros((n_samples, 1), device=self.device)
+        condition = torch.cat((condition, torch.ones_like(condition)), dim=1).view(2 * n_samples, 1)
+        self.model.eval()
+        gen_samples = self.model.decoder(data={}, sample=sample, condition=condition)
         gen_samples = gen_samples['recon'].cpu()
-        for i, img in enumerate(gen_samples):
-            img = np.array(img[0], dtype=float).transpose()[::-1]
-            plt.imshow(img, cmap='gray', vmin=0, vmax=1)
-            plt.savefig(os.path.join('images', "Generated_" + str(i)))
-            plt.show()
+        fig, subplots = plt.subplots(1, 2)
+        for ind, features in enumerate(gen_samples):
+            ax = subplots[ind % 2]
+            img = self.matrix_from_feature(self.train_loader.dataset.res, features)
+            ax.imshow(img, cmap='coolwarm', vmin=-1, vmax=1)
+            ax.set_title(ind % 2)
+            if ind % 2 == 1:
+                fig.savefig(os.path.join('images', 'generated_' + str(ind // 2)))
+                plt.show()
+                fig, subplots = plt.subplots(1, 2)
+        plt.close(fig)
+
 
     @torch.inference_mode()
     def generate_counterfactuals(self, ind, counterfactual_prob=None):
@@ -501,6 +498,7 @@ def get_trainer(args):
         device=device,
         batch_size=args.batch_size,
         training_epochs=args.epochs,
+        c_reg=args.c_reg,
         data_dir=args.data_dir,
         schedule=CosineSchedule(decay_steps=args.decay_period, min_decay=args.min_decay),
     )

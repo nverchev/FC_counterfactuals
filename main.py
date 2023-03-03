@@ -7,7 +7,7 @@ def main():
     trainer = get_trainer(args)
     final = args.exp[:5] == 'final'
     if args.gen:
-        trainer.generate_samples(args.n_gen)
+        trainer.generate_samples(args.gen)
     if not args.eval:
         while args.epochs > trainer.epoch:
             trainer.train(args.checkpoint)

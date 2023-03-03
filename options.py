@@ -52,6 +52,8 @@ class CommonParser(argparse.ArgumentParser):
         self.add_argument('--seed', type=bounded_num(int, imin=1), default=0, help='Torch/Numpy seed (0 no seed)')
         self.add_argument('--ind', type=bounded_num(int, imin=0), default=[0], nargs='+',
                           help='index for reconstruction to visualize and counterfact')
+        self.add_argument('--c_reg', type=bounded_num(float, imin=0), default=0.00001,
+                          help='Coefficient for regularization')
         self.set_defaults(name=name, **self.default_values)
         if os.path.exists('dataset_path.txt'):
             with open('dataset_path.txt', 'r') as f:
@@ -66,8 +68,8 @@ class MainParser(CommonParser):
         self.add_argument('--cond', choices=['svc', 'mlp', 'ae'], default='svc', help='Evaluate the model)')
 
         self.add_argument('--gen', type=bounded_num(int, imin=0), default=0, help='Generate /number/ random samples)')
-        self.add_argument('--c_reg', type=bounded_num(float, imin=0), default=0.00001,
-                          help='Coefficient for regularization')
+
+
 
 class MLPParser(CommonParser):
 
