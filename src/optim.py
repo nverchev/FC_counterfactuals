@@ -44,9 +44,9 @@ def get_opt(opt, initial_learning_rate, weight_decay=0):
                  'SGD_momentum': optim.SGD
                  }
 
-    optimi_args = {'Adam': {'weight_decay': weight_decay, 'lr': initial_learning_rate},
+    optim_args = {'Adam': {'weight_decay': weight_decay, 'lr': initial_learning_rate},
                    'AdamW': {'weight_decay': weight_decay, 'lr': initial_learning_rate},
                    'SGD': {'weight_decay': weight_decay, 'lr': initial_learning_rate},
                    'SGD_momentum': {'weight_decay': weight_decay, 'lr': initial_learning_rate,
                                     'momentum': 0.9, 'nesterov': True}}
-    return optimizer[opt], optimi_args[opt]
+    return optimizer[opt], optim_args[opt]
