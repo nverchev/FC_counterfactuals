@@ -442,43 +442,40 @@ class VAETrainer(AETrainer):
                 fig, subplots = plt.subplots(1, 2)
         plt.close(fig)
 
-
     @torch.inference_mode()
-    def generate_counterfactuals(self, ind, counterfactual_prob=None):
-        assert self.test_metadata.info, 'Need to test a dataset first'
+    def generate_counterfactuals(self, ind, counterfactual_prob=None, s=0.8):
         part = self.test_metadata.info['partition']
         loader = self.test_loader if part == 'test' else self.val_loader if part == 'val' else self.train_loader
         metadata = self.test_metadata[ind]
         index = metadata['indices']
-        [orig, prob, slice_n], label, _ = loader.dataset[index]
+        [orig, prob], label, _ = loader.dataset[index]
+
         counterfactual_prob = np.round(prob < 0.5) if counterfactual_prob is None else counterfactual_prob
         print('Label: ', label, " -  Associated probability: ", prob,
               " - Counterfactual probability: ", counterfactual_prob)
-        orig_data = self.test_outputs[ind]
-        self.metrics(orig_data, [orig, prob], label)
-        condition = 2 * counterfactual_prob * torch.ones((1, 1, 1, 1), device=self.device) - 1
         self.model.eval()
-        orig_data = self.recursive_to(orig_data, self.device)
-        orig_data['z'] = orig_data['mu'][::-1].copy()
-        slice_n = (torch.tensor(slice_n, device=self.device) / 100 - 1).view(-1, 1, 1, 1)
-        with autocast(device_type=self.device.type, dtype=torch.float16):
-            gen_samples_rec = self.model.decoder(data=orig_data, condition=condition, slice_n=slice_n, s=0.8)
+        [orig, prob] = self.recursive_to([orig, prob], self.device)
+        data = self.model.encoder(orig.unsqueeze(0), prob.unsqueeze(0))
+        data_copy = {k: apply(v, check=torch.is_tensor, f=lambda x: x.clone()) for k, v in data.items()}
+        gen_samples_rec = self.model.decoder(data=data,
+                                             condition=torch.tensor([[counterfactual_prob]], device=self.device), s=s)
         gen_samples_rec = gen_samples_rec['recon'].cpu()[0]
-        orig_data['z'] = orig_data['mu'][::-1].copy()
-        condition = 2 * prob * torch.ones((1, 1, 1, 1), device=self.device) - 1
-        orig_data['z'][-1][:, :1, ...] = condition.view(-1, 1, 1, 1) * self._loss.scale_prior
-        with autocast(device_type=self.device.type, dtype=torch.float16):
-            gen_samples_con = self.model.decoder(data=orig_data, condition=condition, slice_n=slice_n, s=0.8)
+        # orig_data['z'][-1][:, :1, ...] = condition.view(-1, 1, 1, 1) * self._loss.scale_prior
+        gen_samples_con = self.model.decoder(data=data_copy, condition=torch.tensor([[prob]], device=self.device), s=s)
         gen_samples_con = gen_samples_con['recon'].cpu()[0]
-
+        orig = orig.cpu()
         counterfactual = torch.clip(orig - gen_samples_rec + gen_samples_con, min=0, max=1)
         if not os.path.exists('images'):
             os.mkdir('images')
-        for name, img in zip(['original', 'counterfactual'], [orig, counterfactual]):
-            img = np.array(img[0], dtype=float).transpose()[::-1]
-            plt.imshow(img, cmap='gray', vmin=0, vmax=1)
-            plt.savefig(os.path.join('images', name + "_" + str(ind)))
-            plt.show()
+        fig, subplots = plt.subplots(1, 2)
+        for ind, (name, features) in enumerate(zip(['Original', 'Counterfactual'], [orig, counterfactual])):
+            ax = subplots[ind]
+            img = self.matrix_from_feature(loader.dataset.res, features)
+            ax.imshow(img, cmap='coolwarm', vmin=-1, vmax=1)
+            ax.set_title(name)
+            if ind == 1:
+                fig.savefig(os.path.join('images', 'counterfactual_' + str(ind // 2)))
+                plt.show()
 
 
 def get_trainer(args):

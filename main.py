@@ -17,7 +17,7 @@ def main():
     trainer.test('test' if final else 'val', save_outputs=args.ind)
     for i in args.ind:
         trainer.viz_sample(i)
-        #trainer.generate_counterfactuals(i)
+        trainer.generate_counterfactuals(i)
 
 
 if __name__ == '__main__':
