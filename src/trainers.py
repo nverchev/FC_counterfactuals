@@ -161,7 +161,7 @@ class Trainer(metaclass=ABCMeta):
             self._run_session(partition='train')
             if self.val_loader and val_after_train:  # check losses on val
                 self.model.eval()
-                with torch.inference_mode:
+                with torch.inference_mode():
                     self._run_session(partition='val')
         return
 

@@ -42,7 +42,7 @@ class CommonParser(argparse.ArgumentParser):
                           help='Number of epochs before lr decays stops')
         self.add_argument('--min_decay', type=bounded_num(float, imin=0), default=1,
                           help='fraction of the initial lr at the end of train')
-        self.add_argument('--checkpoint', type=bounded_num(int, imin=1), default=10,
+        self.add_argument('--checkpoint', type=bounded_num(int, imin=1), default=350,
                           help='Number of epochs between checkpoints')
         self.add_argument('--no_cuda', action='store_true', default=False, help='Runs on CPU')
         self.add_argument('--load', type=bounded_num(int, imin=-1), default=-1,

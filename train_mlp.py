@@ -22,7 +22,7 @@ def main():
         print('Pretrained weights in ' + ae_path + ' loaded.')
     if not args.eval:
         while args.epochs > trainer.epoch:
-            trainer.train(args.checkpoint)
+            trainer.train(args.checkpoint, val_after_train=not final)
             trainer.save()
             if not final:
                 trainer.test('val')
