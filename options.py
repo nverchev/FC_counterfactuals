@@ -26,7 +26,7 @@ class CommonParser(argparse.ArgumentParser):
 
     def __init__(self, name):
         super().__init__(name)
-        self.add_argument('--exp', type=str, default='final', help='Name of the experiment, final when final')
+        self.add_argument('--exp', type=str, default='', help='Name of the experiment, final when final')
         self.add_argument('--data_dir', type=str, default='', help='Directory for data and models')
         self.add_argument('--res', type=int, choices=[444, 122], default=122, help='FC resolution')
         self.add_argument('--z_dim', type=bounded_num(int, imin=1), default=32, help='dim encoding/final features')
@@ -45,7 +45,7 @@ class CommonParser(argparse.ArgumentParser):
         self.add_argument('--checkpoint', type=bounded_num(int, imin=1), default=350,
                           help='Number of epochs between checkpoints')
         self.add_argument('--no_cuda', action='store_true', default=False, help='Runs on CPU')
-        self.add_argument('--load', type=bounded_num(int, imin=-1), default=0,
+        self.add_argument('--load', type=bounded_num(int, imin=-1), default=-1,
                           help='Load a saved model with the same settings. -1 for starting from scratch,'
                                '0 for most recent, otherwise epoch after which the model was saved')
         self.add_argument('--eval', action='store_true', default=False, help='Evaluate the model)')
