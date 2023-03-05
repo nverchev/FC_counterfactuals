@@ -68,7 +68,7 @@ class VAE(AE):
     def sampling(self, mu, log_var):
         std = torch.exp(0.5 * log_var)
         eps = torch.randn_like(std)
-        z = eps.mul(std).add_(mu) if self.training else eps.mul(std / 3).add_(mu)
+        z = eps.mul(std).add_(mu) if self.training else mu
         return z
 
     def encoder(self, x, condition):

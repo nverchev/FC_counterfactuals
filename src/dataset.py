@@ -123,7 +123,7 @@ class FCDataset:
         return
 
 
-def get_loaders(data_dir, res, batch_size, exp, **other_settings):
+def get_loaders(data_dir, res, batch_size, final, **other_settings):
     dataset_settings = dict(
         res=res
     )
@@ -131,7 +131,7 @@ def get_loaders(data_dir, res, batch_size, exp, **other_settings):
     fetch_preprocess(data_dir, res)
     pin_memory = torch.cuda.is_available()
     dataset = FCDataset(data_dir=data_dir, **dataset_settings)
-    if exp[:5] == 'final':
+    if final:
         train_dataset = dataset.split('train_val')
         val_dataset = EmptyDataset()
         test_dataset = dataset.split('test')

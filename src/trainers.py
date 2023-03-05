@@ -384,10 +384,15 @@ class AETrainer(Trainer):
     def helper_inputs(self, inputs, labels):
         return {'x': inputs[0], 'condition': inputs[1]}
 
+    def get_tested_loader(self):
+        assert self.test_metadata is not None, 'Need to test a dataset first'
+        part = self.test_metadata.info['partition']
+        return self.test_loader if part == 'test' else self.val_loader if part == 'val' else self.train_loader
+
     def get_tested_sample(self, ind):
         assert self.test_metadata is not None, 'Need to test a dataset first'
         part = self.test_metadata.info['partition']
-        loader = self.test_loader if part == 'test' else self.val_loader if part == 'val' else self.train_loader
+        loader = self.get_tested_loader()
         metadata = self.test_metadata[ind]
         index = metadata['indices']
         return loader.dataset[index]
@@ -419,7 +424,7 @@ class AETrainer(Trainer):
 
     @staticmethod
     def plot_heatmap(ax, img, title):
-        ax.imshow(img, cmap='coolwarm', vmin=-1, vmax=1)
+        ax.imshow(img, cmap='cool' + 'warm', vmin=-1, vmax=1)
         ax.set_title(title)
 
 
@@ -450,27 +455,26 @@ class VAETrainer(AETrainer):
                 fig, subplots = plt.subplots(1, 2)
         plt.close(fig)
 
-    def viz_counterfactual(self, ind, counterfactual_prob=None):
+    def viz_counterfactual(self, ind, model, target_prob=None):
         [orig, prob], label, _ = self.get_tested_sample(ind)
         orig, prob = orig.unsqueeze(0), prob.view(1, 1)
-        if counterfactual_prob is None:
-            counterfactual_prob = (prob < 0.5).float()
+        if target_prob is None:
+            target_prob = torch.less(prob, 0.5).float()
         else:
-            counterfactual_prob = torch.tensor([[counterfactual_prob]], device=self.device)
-        counterfactual = self.generate_counterfactuals(orig, prob, counterfactual_prob).squeeze()
-        print(f'Label: {label.item():.3f} -  Associated probability: {prob.item():.3f} -  '
-              f'Counterfactual probability: {counterfactual_prob.item():.3f}')
-        self.plot_counterfactuals(orig, prob, label, counterfactual, counterfactual_prob, file=str(ind))
+            target_prob = torch.tensor([[target_prob]], device=self.device)
+        counterfactual = self.generate_counterfactuals(orig, prob, target_prob)
+        counterfactual_prob = model(counterfactual)
+        self.plot_counterfactuals(orig, prob, label, counterfactual.squeeze(), counterfactual_prob, file=str(ind))
 
     @torch.inference_mode()
-    def generate_counterfactuals(self, orig, prob, counterfactual_prob):
+    def generate_counterfactuals(self, orig, prob, target_prob):
         self.model.eval()
-        [orig, prob, counterfactual_prob] = self.recursive_to([orig, prob, counterfactual_prob], self.device)
+        [orig, prob, target_prob] = self.recursive_to([orig, prob, target_prob], self.device)
         data = self.model.encoder(orig, prob)
         data_copy = {k: apply(v, check=torch.is_tensor, f=lambda x: x.clone()) for k, v in data.items()}
-        data_copy['z'][-1][:, -1] = counterfactual_prob * self._loss.scale_prior
+        data_copy['z'][0][:, :1] = target_prob * self._loss.scale_prior
         gen_samples_rec = self.model.decoder(data=data, condition=prob)['recon']
-        gen_samples_con = self.model.decoder(data=data_copy, condition=counterfactual_prob)['recon']
+        gen_samples_con = self.model.decoder(data=data_copy, condition=target_prob)['recon']
         counterfactuals = torch.clip(orig - gen_samples_rec + gen_samples_con, min=-1, max=1)
         return counterfactuals.cpu()
 
@@ -482,37 +486,46 @@ class VAETrainer(AETrainer):
         fig.suptitle('True Label: ' + str(label) + ' (' + ['Diagnosed with ADS)', 'Typically developed)'][label])
         prob = np.round(prob.item(), 3)
         counterfactual_prob = np.round(counterfactual_prob.item(), 3)
-        self.plot_matrix_connectome(fig, subplots, 'Original', orig, prob, 0, show)
-        self.plot_matrix_connectome(fig, subplots, 'Counterfactual', counterfactual, counterfactual_prob, 1, show)
+        self.plot_matrix_connectome(fig, subplots, 'Original', orig, prob, 0)
+        self.plot_matrix_connectome(fig, subplots, 'Counterfactual', counterfactual, counterfactual_prob, 1)
+        if show:
+            plt.show()
         fig.savefig(os.path.join('images', 'counterfactual_' + file))
         return
 
-    def plot_matrix_connectome(self, fig, subplots, name, features, p, i, show):
+    def plot_matrix_connectome(self, fig, subplots, name, features, prob, i):
         ax = subplots[0][i]
         img = self.matrix_from_feature(self.res, features)
         self.plot_heatmap(ax, img, name)
         ax = subplots[1][i]
-        ax.set_title(f'Target Probability: {p:.3f}')
+        ax.set_title(f'Health Probability: {prob:.3f}')
         plot_connectome(img, os.path.dirname(self.models_path), res=self.res, fig=fig, ax=ax)
-        if not show:
-            plt.close()
         return
 
-    #
-    # def evaluate_counterfactuals(self, model, s=0):
-    #
-    #     counterfactual_prob = torch.round(prob < 0.5)
-    #     counterfactuals = generate_counterfactuals(self, orig, prob, counterfactual_prob)
-    #     counterfactuals_estimated_prob = model(counterfactuals.reshape(len(estimated_probs), -1))
-    #     estimated_pred = np.greater(prob, 0.5)
-    #     counterfactuals_estimated_pred = np.greater(counterfactuals_estimated_prob, 0.5)
-    #     print('Success percentage: ', np.not_equal(estimated_pred, counterfactuals_estimated_pred).mean())
+    def evaluate_counterfactuals(self, model, part, save_fig=False):
+        loader = self.test_loader if part == 'test' else self.val_loader if part == 'val' else self.train_loader
+        dataset = loader.dataset
+        matrices = dataset.matrices
+        labels = dataset.labels
+        probs = dataset.condition.reshape(-1, 1)
+        files = dataset.metadata['file']
+        target_probs = np.less(probs, 0.5)
+        counterfactuals = self.generate_counterfactuals(*map(lambda x: torch.from_numpy(x).float(),
+                                                             [matrices, probs, target_probs]))
+        counterfactuals_prob = model(counterfactuals)
+        pred = np.greater_equal(probs, 0.5).flatten()
+        counterfactuals_pred = np.greater_equal(counterfactuals_prob, 0.5)
+        print('Success percentage: ', np.not_equal(pred, counterfactuals_pred).mean())
+        if save_fig:
+            for orig, p, l, c, c_p, file in zip(matrices, probs, labels, counterfactuals, counterfactuals_prob, files):
+                self.plot_counterfactuals(orig, p, l, c, c_p, file=file, show=False)
+        return counterfactuals
 
 
-def get_trainer(args):
+def get_trainer(args, final):
     if args.seed:
         torch.manual_seed = np.random.seed = args.seed
-    train_loader, val_loader, test_loader = get_loaders(**vars(args))
+    train_loader, val_loader, test_loader = get_loaders(**vars(args), final=final)
     model = get_model(**vars(args))
     optimizer, optim_args = get_opt(args.optim, args.lr, args.wd)
     device = torch.device('cuda:0' if torch.cuda.is_available() and not args.no_cuda else 'cpu')

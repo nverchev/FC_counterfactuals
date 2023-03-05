@@ -10,7 +10,7 @@ def main():
     args = Parser().parse_args()
     exp = args.exp
     if args.pretrain:
-        args.exp = 'pretrain_' + args.exp
+        args.exp = '_'.join(filter(bool, ['pretrain',  exp]))
     trainer = get_trainer(args)
     final = args.exp[:5] == 'final'
     if args.pretrain and args.load == -1:
