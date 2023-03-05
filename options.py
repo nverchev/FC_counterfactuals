@@ -28,7 +28,7 @@ class CommonParser(argparse.ArgumentParser):
         super().__init__(name)
         self.add_argument('--exp', type=str, default='', help='Name of the experiment, final when final')
         self.add_argument('--data_dir', type=str, default='', help='Directory for data and models')
-        self.add_argument('--res', type=int, choices=[444, 122], default=444, help='FC resolution')
+        self.add_argument('--res', type=int, choices=[444, 122], default=122, help='FC resolution')
         self.add_argument('--z_dim', type=bounded_num(int, imin=1), default=32, help='dim encoding/final features')
         self.add_argument('--batch_size', type=bounded_num(int, imin=1), default=64)
         self.add_argument('--optim', type=str, default='AdamW', choices=['SGD', 'SGD_momentum', 'Adam', 'AdamW'],
@@ -68,7 +68,6 @@ class MainParser(CommonParser):
         self.add_argument('--cond', choices=['svc', 'mlp', 'ae'], default='svc', help='Evaluate the model)')
 
         self.add_argument('--gen', type=bounded_num(int, imin=0), default=0, help='Generate /number/ random samples)')
-
 
 
 class MLPParser(CommonParser):
