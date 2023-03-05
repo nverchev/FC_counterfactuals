@@ -5,8 +5,24 @@ from sklearn.model_selection import train_test_split
 import torch
 from torch.utils.data import Dataset
 from nilearn import datasets
+from nilearn.image import load_img
 from nilearn.connectome import ConnectivityMeasure
 from nilearn.maskers import NiftiLabelsMasker
+import nilearn.plotting as nip
+
+
+def plot_connectome(fc, label, data_dir, res, fig, ax):
+    atlas_path = os.path.join(data_dir, 'ABIDE_pcp', 'basc_multiscale_2015',
+                              'template_cambridge_basc_multiscale_nii_sym',
+                              f'template_cambridge_basc_multiscale_sym_scale{res}.nii.gz')
+    atlas = load_img(atlas_path)
+    coords, labels = nip.find_parcellation_cut_coords(atlas, return_label_names=True)
+    return nip.plot_connectome(fc, coords,
+                               display_mode='lzry',
+                               edge_threshold=0.7,
+                               node_size=3,
+                               figure=fig,
+                               axes=ax)
 
 
 def fetch_preprocess(data_dir, res):

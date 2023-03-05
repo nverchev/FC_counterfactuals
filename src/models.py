@@ -17,7 +17,7 @@ class MLP(nn.Module):
         self.h_dims = [x_dim, 512, 256, z_dim]
         self.encode = nn.ModuleList([])
         for in_features, out_features in zip(self.h_dims[:-2], self.h_dims[1:-1]):
-            self.encode.append(get_linear_layer(in_features, out_features, drop_out=0.2))
+            self.encode.append(get_linear_layer(in_features, out_features, drop_out=0))
         self.encode.append(nn.Linear(self.h_dims[-2], self.h_dims[-1]))
         self.classifier = nn.Sequential(nn.ReLU(), nn.Linear(self.h_dims[-1], 1))
         self.settings = dict(hidden_layers=self.h_dims)

@@ -8,7 +8,7 @@ from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
 from abc import ABCMeta, abstractmethod
 from collections import UserDict
-from src.dataset import get_loaders
+from src.dataset import get_loaders, plot_connectome
 from src.models import get_model
 from src.loss_and_metrics import MLPLoss, AELoss, VAEXLoss, MLPMetrics, ClassMetrics
 from src.optim import get_opt, CosineSchedule
@@ -404,7 +404,7 @@ class AETrainer(Trainer):
             ax.set_title(name)
             if ind == 1:
                 fig.savefig(os.path.join('images', 'reconstruction_' + str(ind // 2)))
-                plt.show()
+                plt.close()
 
     @staticmethod
     def matrix_from_feature(res, features):
@@ -439,12 +439,12 @@ class VAETrainer(AETrainer):
             ax.set_title(ind % 2)
             if ind % 2 == 1:
                 fig.savefig(os.path.join('images', 'generated_' + str(ind // 2)))
-                plt.show()
+                plt.close()
                 fig, subplots = plt.subplots(1, 2)
         plt.close(fig)
 
     @torch.inference_mode()
-    def generate_counterfactuals(self, ind, counterfactual_prob=None, s=0):
+    def generate_counterfactuals(self, ind, counterfactual_prob=None, plot=True, show=True):
         part = self.test_metadata.info['partition']
         loader = self.test_loader if part == 'test' else self.val_loader if part == 'val' else self.train_loader
         metadata = self.test_metadata[ind]
@@ -452,33 +452,52 @@ class VAETrainer(AETrainer):
         [orig, prob], label, _ = loader.dataset[index]
 
         counterfactual_prob = np.round(prob < 0.5) if counterfactual_prob is None else counterfactual_prob
-        print(f'Label: {label.item():.3f} -  Associated probability: {prob.item():.3f} -  '
-              f'Counterfactual probability: {counterfactual_prob.item():.3f}')
+        if not show:
+            print(f'Label: {label.item():.3f} -  Associated probability: {prob.item():.3f} -  '
+                  f'Counterfactual probability: {counterfactual_prob.item():.3f}')
         self.model.eval()
         [orig, prob] = self.recursive_to([orig, prob], self.device)
         data = self.model.encoder(orig.unsqueeze(0), prob.unsqueeze(0))
         data_copy = {k: apply(v, check=torch.is_tensor, f=lambda x: x.clone()) for k, v in data.items()}
         data_copy['z'][-1][:, -1] = counterfactual_prob * self._loss.scale_prior
-        gen_samples_con = self.model.decoder(data=data, condition=torch.tensor([[prob]], device=self.device), s=s)
-        gen_samples_con = gen_samples_con['recon'].cpu()[0]
-        gen_samples_rec = self.model.decoder(data=data_copy,
-                                             condition=torch.tensor([[counterfactual_prob]], device=self.device), s=s)
+        gen_samples_rec = self.model.decoder(data=data, condition=torch.tensor([[prob]], device=self.device))
         gen_samples_rec = gen_samples_rec['recon'].cpu()[0]
+        gen_samples_con = self.model.decoder(data=data_copy,
+                                             condition=torch.tensor([[counterfactual_prob]], device=self.device))
+        gen_samples_con = gen_samples_con['recon'].cpu()[0]
 
         orig = orig.cpu()
-        print((- gen_samples_rec + gen_samples_con).mean())
-        counterfactual = torch.clip(orig - gen_samples_rec + gen_samples_con, min=0, max=1)
-        if not os.path.exists('images'):
-            os.mkdir('images')
-        fig, subplots = plt.subplots(1, 2)
-        for ind, (name, features) in enumerate(zip(['Original', 'Counterfactual'], [orig, counterfactual])):
-            ax = subplots[ind]
-            img = self.matrix_from_feature(loader.dataset.res, features)
-            ax.imshow(img, cmap='coolwarm', vmin=-1, vmax=1)
-            ax.set_title(name)
-            if ind == 1:
-                fig.savefig(os.path.join('images', 'counterfactual_' + str(ind // 2)))
-                plt.show()
+        counterfactual = orig - gen_samples_rec + gen_samples_con
+        if plot:
+            if not os.path.exists('images'):
+                os.mkdir('images')
+            fig, subplots = plt.subplots(2, 2, figsize=[15, 10])
+
+            for i, (name, features, label) in enumerate(zip(['Original', 'Counterfactual'], [orig, counterfactual],
+                                                            [prob.item(), counterfactual_prob.item()])):
+                ax = subplots[0][i]
+                img = self.matrix_from_feature(loader.dataset.res, features)
+                ax.imshow(img, cmap='cool' + 'warm', vmin=-1, vmax=1)
+                ax.set_title(name)
+                ax = subplots[1][i]
+                ax.set_title(f'Target Probability: {label:.3f}')
+                plot_connectome(img, label, os.path.dirname(self.models_path), res=loader.dataset.res, fig=fig, ax=ax)
+                if i == 1:
+                    fig.savefig(os.path.join('images', 'counterfactual_' + str(ind)))
+                    if not show:
+                        plt.close()
+        return counterfactual
+
+    def evaluate_counterfactuals(self, model, s=0):
+        part = self.test_metadata.info['partition']
+        loader = self.test_loader if part == 'test' else self.val_loader if part == 'val' else self.train_loader
+        estimated_probs = np.concatenate([inputs[0][1] for inputs in loader.dataset])
+        counterfactuals = np.concatenate([self.generate_counterfactuals(i, plot=False, show=False)
+                                          for i in range(len(loader.dataset))])
+        counterfactuals_estimated_prob = model(counterfactuals.reshape(len(estimated_probs), -1))
+        estimated_pred = np.greater(estimated_probs, 0.5)
+        counterfactuals_estimated_pred = np.greater(counterfactuals_estimated_prob, 0.5)
+        print('Success percentage: ', np.not_equal(estimated_pred, counterfactuals_estimated_pred).mean())
 
 
 def get_trainer(args):
@@ -503,8 +522,7 @@ def get_trainer(args):
         schedule=CosineSchedule(decay_steps=args.decay_period, min_decay=args.min_decay),
     )
 
-    exp_name = '_'.join(args.name.lower().split(' ') + [args.exp]).strip('_')
-
+    exp_name = '_'.join(filter(bool, args.name.lower().split(' ') + [args.exp]))
     trainer_mapping = {
         'AE': AETrainer,
         'MLP': MLPTrainer,
