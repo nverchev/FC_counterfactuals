@@ -36,13 +36,13 @@ class CommonParser(argparse.ArgumentParser):
         self.add_argument('--lr', type=bounded_num(float, imin=0), default=0.001, help='Learning rate')
         self.add_argument('--wd', type=bounded_num(float, imin=0), default=0.00001, help='Weight decay')
 
-        self.add_argument('--epochs', type=bounded_num(int, imin=1), default=350,
+        self.add_argument('--epochs', type=bounded_num(int, imin=1), default=150,
                           help='Number of total training epochs')
-        self.add_argument('--decay_period', type=bounded_num(int, imin=0), default=250,
+        self.add_argument('--decay_period', type=bounded_num(int, imin=0), default=100,
                           help='Number of epochs before lr decays stops')
         self.add_argument('--min_decay', type=bounded_num(float, imin=0), default=1,
                           help='fraction of the initial lr at the end of train')
-        self.add_argument('--checkpoint', type=bounded_num(int, imin=1), default=350,
+        self.add_argument('--checkpoint', type=bounded_num(int, imin=1), default=150,
                           help='Number of epochs between checkpoints')
         self.add_argument('--no_cuda', action='store_true', default=False, help='Runs on CPU')
         self.add_argument('--load', type=bounded_num(int, imin=-1), default=-1,
@@ -61,7 +61,7 @@ class CommonParser(argparse.ArgumentParser):
 
 
 class MainParser(CommonParser):
-    default_values = {'lr': 0.0001}
+    default_values = {'lr': 0.0001, 'epochs': 1000, 'checkpoint': 1000}
 
     def __init__(self):
         super().__init__('Counterfactual VAE')
@@ -80,7 +80,7 @@ class MLPParser(CommonParser):
 
 
 class AEParser(CommonParser):
-    default_values = {'lr': 0.0001}
+    default_values = {'lr': 0.0001, 'epochs': 350, 'checkpoint': 350}
 
     def __init__(self):
         super().__init__('AE')

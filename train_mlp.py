@@ -9,10 +9,10 @@ from src.trainers import get_trainer
 def main():
     args = Parser().parse_args()
     exp = args.exp
+    final = exp[:5] == 'final'
     if args.pretrain:
         args.exp = '_'.join(filter(bool, ['pretrain',  exp]))
-    trainer = get_trainer(args)
-    final = args.exp[:5] == 'final'
+    trainer = get_trainer(args, final)
     if args.pretrain and args.load == -1:
         ae_path_dir = os.path.join(args.data_dir, 'models', '_'.join(filter(bool, ['ae',  exp])))
         final_epoch = json.load(open(os.path.join(ae_path_dir, 'settings.json')))['training_epochs']

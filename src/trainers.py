@@ -488,9 +488,11 @@ class VAETrainer(AETrainer):
         counterfactual_prob = np.round(counterfactual_prob.item(), 3)
         self.plot_matrix_connectome(fig, subplots, 'Original', orig, prob, 0)
         self.plot_matrix_connectome(fig, subplots, 'Counterfactual', counterfactual, counterfactual_prob, 1)
+        fig.savefig(os.path.join('images', 'counterfactual_' + file))
         if show:
             plt.show()
-        fig.savefig(os.path.join('images', 'counterfactual_' + file))
+        else:
+            plt.close()
         return
 
     def plot_matrix_connectome(self, fig, subplots, name, features, prob, i):
