@@ -28,8 +28,9 @@ def main():
                 trainer.test('val')
     if final:
         prob_name = 'ae_prob' if args.pretrain else 'mlp_prob'
-        train_metadata = trainer.update_metadata(partition='train', prob_name=prob_name)
-        test_metadata = trainer.update_metadata(partition='test', prob_name=prob_name)
+        rescale = 2 if args.pretrain else 4
+        train_metadata = trainer.update_metadata(partition='train', prob_name=prob_name, rescale=rescale)
+        test_metadata = trainer.update_metadata(partition='test', prob_name=prob_name, rescale=rescale)
         metadata = pd.concat([train_metadata, test_metadata])
         metadata_pth = os.path.join(args.data_dir, 'metadata.csv')
         orig_metadata = pd.read_csv(metadata_pth)['file']

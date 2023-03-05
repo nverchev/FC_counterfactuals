@@ -360,13 +360,19 @@ class MLPTrainer(Trainer):
             ClassMetrics()(targets, pred)
         return
 
-    def update_metadata(self, partition, prob_name):
+    def update_metadata(self, partition, prob_name, rescale):
+
+        def rescaling(x, i):
+            if i:
+                x = np.arccos(-2 * rescaling(x, i - 1) + 1) / np.pi
+            return x
+
         self.test(partition=partition, save_outputs=True)
         loader = self.train_loader if partition == 'train' else self.test_loader
         metadata = loader.dataset.metadata
         indices = torch.stack(self.test_metadata['indices'])
         probs = torch.sigmoid(torch.cat(self.test_outputs['logits']))
-        metadata[prob_name].values[indices] = probs
+        metadata[prob_name].values[indices] = rescaling(probs, rescale)
         return metadata
 
 
@@ -483,7 +489,7 @@ class VAETrainer(AETrainer):
         if not os.path.exists('images'):
             os.mkdir('images')
         fig, subplots = plt.subplots(2, 2, figsize=[15, 10])
-        fig.suptitle('True Label: ' + str(label) + ' (' + ['Diagnosed with ADS)', 'Typically developed)'][label])
+        fig.suptitle('True Label: ' + str(label) + ' (' + ['Diagnosed with ASDO)', 'Typically developed)'][label])
         prob = np.round(prob.item(), 3)
         counterfactual_prob = np.round(counterfactual_prob.item(), 3)
         self.plot_matrix_connectome(fig, subplots, 'Original', orig, prob, 0)
