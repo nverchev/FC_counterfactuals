@@ -45,7 +45,7 @@ class CommonParser(argparse.ArgumentParser):
         self.add_argument('--checkpoint', type=bounded_num(int, imin=1), default=350,
                           help='Number of epochs between checkpoints')
         self.add_argument('--no_cuda', action='store_true', default=False, help='Runs on CPU')
-        self.add_argument('--load', type=bounded_num(int, imin=-1), default=-1,
+        self.add_argument('--load', type=bounded_num(int, imin=-1), default=0,
                           help='Load a saved model with the same settings. -1 for starting from scratch,'
                                '0 for most recent, otherwise epoch after which the model was saved')
         self.add_argument('--eval', action='store_true', default=False, help='Evaluate the model)')
@@ -61,7 +61,7 @@ class CommonParser(argparse.ArgumentParser):
 
 
 class MainParser(CommonParser):
-    default_values = {'lr': 0.0001, 'res': 122}
+    default_values = {'lr': 0.0001}
 
     def __init__(self):
         super().__init__('Counterfactual VAE')

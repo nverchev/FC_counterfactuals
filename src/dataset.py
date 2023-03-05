@@ -11,7 +11,7 @@ from nilearn.maskers import NiftiLabelsMasker
 import nilearn.plotting as nip
 
 
-def plot_connectome(fc, label, data_dir, res, fig, ax):
+def plot_connectome(fc, data_dir, res, fig, ax):
     atlas_path = os.path.join(data_dir, 'ABIDE_pcp', 'basc_multiscale_2015',
                               'template_cambridge_basc_multiscale_nii_sym',
                               f'template_cambridge_basc_multiscale_sym_scale{res}.nii.gz')

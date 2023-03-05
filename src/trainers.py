@@ -375,6 +375,7 @@ class AETrainer(Trainer):
     def __init__(self, model, exp_name, block_args):
         super().__init__(model, exp_name, **block_args)
         self._loss = AELoss()
+        self.res = self.train_loader.dataset.res
         return
 
     def loss(self, output, inputs, targets):
@@ -383,13 +384,16 @@ class AETrainer(Trainer):
     def helper_inputs(self, inputs, labels):
         return {'x': inputs[0], 'condition': inputs[1]}
 
-    def viz_sample(self, ind):
+    def get_tested_sample(self, ind):
         assert self.test_metadata is not None, 'Need to test a dataset first'
         part = self.test_metadata.info['partition']
         loader = self.test_loader if part == 'test' else self.val_loader if part == 'val' else self.train_loader
         metadata = self.test_metadata[ind]
         index = metadata['indices']
-        [orig, prob], label, _ = loader.dataset[index]
+        return loader.dataset[index]
+
+    def viz_sample(self, ind):
+        [orig, prob], label, _ = self.get_tested_sample(ind)
         orig_data = self.test_outputs[ind]
         mse = self.metrics(orig_data, [orig.unsqueeze(0), prob.unsqueeze(0)], label)['MSE']
         print(f'Label: {label.item():.3f} -  Associated probability: {prob.item():.3f} -  MSE: {mse.item():.3f}')
@@ -399,12 +403,11 @@ class AETrainer(Trainer):
         fig, subplots = plt.subplots(1, 2)
         for ind, (name, features) in enumerate({'Original': orig, 'Reconstruction': recon}.items()):
             ax = subplots[ind]
-            img = self.matrix_from_feature(loader.dataset.res, features)
-            ax.imshow(img, cmap='coolwarm', vmin=-1, vmax=1)
-            ax.set_title(name)
+            img = self.matrix_from_feature(self.res, features)
+            self.plot_heatmap(ax, img, name)
             if ind == 1:
                 fig.savefig(os.path.join('images', 'reconstruction_' + str(ind // 2)))
-                plt.close()
+                plt.show()
 
     @staticmethod
     def matrix_from_feature(res, features):
@@ -413,6 +416,11 @@ class AETrainer(Trainer):
         matrix += matrix.transpose()
         matrix[np.diag_indices(res)] = 1
         return matrix
+
+    @staticmethod
+    def plot_heatmap(ax, img, title):
+        ax.imshow(img, cmap='coolwarm', vmin=-1, vmax=1)
+        ax.set_title(title)
 
 
 class VAETrainer(AETrainer):
@@ -434,70 +442,71 @@ class VAETrainer(AETrainer):
         fig, subplots = plt.subplots(1, 2)
         for ind, features in enumerate(gen_samples):
             ax = subplots[ind % 2]
-            img = self.matrix_from_feature(self.train_loader.dataset.res, features)
-            ax.imshow(img, cmap='coolwarm', vmin=-1, vmax=1)
-            ax.set_title(ind % 2)
+            img = self.matrix_from_feature(self.res, features)
+            self.plot_heatmap(ax, img, 'Condition: ' + str(ind % 2))
             if ind % 2 == 1:
                 fig.savefig(os.path.join('images', 'generated_' + str(ind // 2)))
                 plt.close()
                 fig, subplots = plt.subplots(1, 2)
         plt.close(fig)
 
-    @torch.inference_mode()
-    def generate_counterfactuals(self, ind, counterfactual_prob=None, plot=True, show=True):
-        part = self.test_metadata.info['partition']
-        loader = self.test_loader if part == 'test' else self.val_loader if part == 'val' else self.train_loader
-        metadata = self.test_metadata[ind]
-        index = metadata['indices']
-        [orig, prob], label, _ = loader.dataset[index]
+    def viz_counterfactual(self, ind, counterfactual_prob=None):
+        [orig, prob], label, _ = self.get_tested_sample(ind)
+        orig, prob = orig.unsqueeze(0), prob.view(1, 1)
+        if counterfactual_prob is None:
+            counterfactual_prob = (prob < 0.5).float()
+        else:
+            counterfactual_prob = torch.tensor([[counterfactual_prob]], device=self.device)
+        counterfactual = self.generate_counterfactuals(orig, prob, counterfactual_prob).squeeze()
+        print(f'Label: {label.item():.3f} -  Associated probability: {prob.item():.3f} -  '
+              f'Counterfactual probability: {counterfactual_prob.item():.3f}')
+        self.plot_counterfactuals(orig, prob, label, counterfactual, counterfactual_prob, file=str(ind))
 
-        counterfactual_prob = np.round(prob < 0.5) if counterfactual_prob is None else counterfactual_prob
-        if not show:
-            print(f'Label: {label.item():.3f} -  Associated probability: {prob.item():.3f} -  '
-                  f'Counterfactual probability: {counterfactual_prob.item():.3f}')
+    @torch.inference_mode()
+    def generate_counterfactuals(self, orig, prob, counterfactual_prob):
         self.model.eval()
-        [orig, prob] = self.recursive_to([orig, prob], self.device)
-        data = self.model.encoder(orig.unsqueeze(0), prob.unsqueeze(0))
+        [orig, prob, counterfactual_prob] = self.recursive_to([orig, prob, counterfactual_prob], self.device)
+        data = self.model.encoder(orig, prob)
         data_copy = {k: apply(v, check=torch.is_tensor, f=lambda x: x.clone()) for k, v in data.items()}
         data_copy['z'][-1][:, -1] = counterfactual_prob * self._loss.scale_prior
-        gen_samples_rec = self.model.decoder(data=data, condition=torch.tensor([[prob]], device=self.device))
-        gen_samples_rec = gen_samples_rec['recon'].cpu()[0]
-        gen_samples_con = self.model.decoder(data=data_copy,
-                                             condition=torch.tensor([[counterfactual_prob]], device=self.device))
-        gen_samples_con = gen_samples_con['recon'].cpu()[0]
+        gen_samples_rec = self.model.decoder(data=data, condition=prob)['recon']
+        gen_samples_con = self.model.decoder(data=data_copy, condition=counterfactual_prob)['recon']
+        counterfactuals = torch.clip(orig - gen_samples_rec + gen_samples_con, min=-1, max=1)
+        return counterfactuals.cpu()
 
-        orig = orig.cpu()
-        counterfactual = orig - gen_samples_rec + gen_samples_con
-        if plot:
-            if not os.path.exists('images'):
-                os.mkdir('images')
-            fig, subplots = plt.subplots(2, 2, figsize=[15, 10])
+    def plot_counterfactuals(self, orig, prob, label, counterfactual, counterfactual_prob, file='', show=True):
+        label = int(label)
+        if not os.path.exists('images'):
+            os.mkdir('images')
+        fig, subplots = plt.subplots(2, 2, figsize=[15, 10])
+        fig.suptitle('True Label: ' + str(label) + ' (' + ['Diagnosed with ADS)', 'Typically developed)'][label])
+        prob = np.round(prob.item(), 3)
+        counterfactual_prob = np.round(counterfactual_prob.item(), 3)
+        self.plot_matrix_connectome(fig, subplots, 'Original', orig, prob, 0, show)
+        self.plot_matrix_connectome(fig, subplots, 'Counterfactual', counterfactual, counterfactual_prob, 1, show)
+        fig.savefig(os.path.join('images', 'counterfactual_' + file))
+        return
 
-            for i, (name, features, label) in enumerate(zip(['Original', 'Counterfactual'], [orig, counterfactual],
-                                                            [prob.item(), counterfactual_prob.item()])):
-                ax = subplots[0][i]
-                img = self.matrix_from_feature(loader.dataset.res, features)
-                ax.imshow(img, cmap='cool' + 'warm', vmin=-1, vmax=1)
-                ax.set_title(name)
-                ax = subplots[1][i]
-                ax.set_title(f'Target Probability: {label:.3f}')
-                plot_connectome(img, label, os.path.dirname(self.models_path), res=loader.dataset.res, fig=fig, ax=ax)
-                if i == 1:
-                    fig.savefig(os.path.join('images', 'counterfactual_' + str(ind)))
-                    if not show:
-                        plt.close()
-        return counterfactual
+    def plot_matrix_connectome(self, fig, subplots, name, features, p, i, show):
+        ax = subplots[0][i]
+        img = self.matrix_from_feature(self.res, features)
+        self.plot_heatmap(ax, img, name)
+        ax = subplots[1][i]
+        ax.set_title(f'Target Probability: {p:.3f}')
+        plot_connectome(img, os.path.dirname(self.models_path), res=self.res, fig=fig, ax=ax)
+        if not show:
+            plt.close()
+        return
 
-    def evaluate_counterfactuals(self, model, s=0):
-        part = self.test_metadata.info['partition']
-        loader = self.test_loader if part == 'test' else self.val_loader if part == 'val' else self.train_loader
-        estimated_probs = np.concatenate([inputs[0][1] for inputs in loader.dataset])
-        counterfactuals = np.concatenate([self.generate_counterfactuals(i, plot=False, show=False)
-                                          for i in range(len(loader.dataset))])
-        counterfactuals_estimated_prob = model(counterfactuals.reshape(len(estimated_probs), -1))
-        estimated_pred = np.greater(estimated_probs, 0.5)
-        counterfactuals_estimated_pred = np.greater(counterfactuals_estimated_prob, 0.5)
-        print('Success percentage: ', np.not_equal(estimated_pred, counterfactuals_estimated_pred).mean())
+    #
+    # def evaluate_counterfactuals(self, model, s=0):
+    #
+    #     counterfactual_prob = torch.round(prob < 0.5)
+    #     counterfactuals = generate_counterfactuals(self, orig, prob, counterfactual_prob)
+    #     counterfactuals_estimated_prob = model(counterfactuals.reshape(len(estimated_probs), -1))
+    #     estimated_pred = np.greater(prob, 0.5)
+    #     counterfactuals_estimated_pred = np.greater(counterfactuals_estimated_prob, 0.5)
+    #     print('Success percentage: ', np.not_equal(estimated_pred, counterfactuals_estimated_pred).mean())
 
 
 def get_trainer(args):
