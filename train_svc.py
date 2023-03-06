@@ -8,11 +8,13 @@ from src.dataset import get_loaders
 from src.loss_and_metrics import ClassMetrics
 args = Parser().parse_args()
 
+final = args.exp[:5] == 'final'
+args.final = final
+
 train_loader, val_loader, test_loader = get_loaders(**vars(args))
 train_data = train_loader.dataset.matrices
 train_labels = train_loader.dataset.labels
 train_metadata = train_loader.dataset.metadata
-final = args.exp[:5] == 'final'
 model_path = os.path.join(args.data_dir, 'models', '_'.join(filter(bool, ['svc', args.exp])) + '.joblib')
 model = SVC(kernel=args.kernel, C=args.C, gamma='auto', random_state=args.seed, probability=True)
 if not args.eval:
