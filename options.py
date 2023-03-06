@@ -57,7 +57,7 @@ class CommonParser(argparse.ArgumentParser):
         self.set_defaults(name=name, **self.default_values)
         if os.path.exists('dataset_path.txt'):
             with open('dataset_path.txt', 'r') as f:
-                self.set_defaults(data_dir=f.read())
+                self.set_defaults(data_dir=f.readline().rstrip())
 
 
 class MainParser(CommonParser):
