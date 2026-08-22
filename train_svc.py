@@ -10,7 +10,6 @@ args = Parser().parse_args()
 
 final = args.exp[:5] == 'final'
 args.final = final
-
 train_loader, val_loader, test_loader = get_loaders(**vars(args))
 train_data = train_loader.dataset.matrices
 train_labels = train_loader.dataset.labels

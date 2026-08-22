@@ -1,2 +1,6 @@
-/dataset_path.txt
+.env
+.venv
+.venv/
 __pycache__
+__pycache__/
+images/

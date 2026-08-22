@@ -411,7 +411,7 @@ class AETrainer(Trainer):
         recon = orig_data['recon'].squeeze(0)
         if not os.path.exists('images'):
             os.mkdir('images')
-        fig, subplots = plt.subplots(1, 2)
+        fig, subplots = plt.subplots(1, 2, figsize=[15, 10])
         for ind, (name, features) in enumerate({'Original': orig, 'Reconstruction': recon}.items()):
             ax = subplots[ind]
             img = self.matrix_from_feature(self.res, features)
@@ -432,6 +432,7 @@ class AETrainer(Trainer):
     def plot_heatmap(ax, img, title):
         ax.imshow(img, cmap='cool' + 'warm', vmin=-1, vmax=1)
         ax.set_title(title)
+        ax.title.set_fontsize(18)
 
 
 class VAETrainer(AETrainer):
@@ -468,7 +469,7 @@ class VAETrainer(AETrainer):
             target_prob = torch.less(prob, 0.5).float()
         else:
             target_prob = torch.tensor([[target_prob]], device=self.device)
-        counterfactual = self.generate_counterfactuals(orig, prob, target_prob)
+        counterfactual, _, _ = self.generate_counterfactuals(orig, prob, target_prob)
         counterfactual_prob = model(counterfactual)
         self.plot_counterfactuals(orig, prob, label, counterfactual.squeeze(), counterfactual_prob, file=str(ind))
 
@@ -482,7 +483,7 @@ class VAETrainer(AETrainer):
         gen_samples_rec = self.model.decoder(data=data, condition=prob)['recon']
         gen_samples_con = self.model.decoder(data=data_copy, condition=target_prob)['recon']
         counterfactuals = torch.clip(orig - gen_samples_rec + gen_samples_con, min=-1, max=1)
-        return counterfactuals.cpu()
+        return counterfactuals.cpu(), gen_samples_rec.cpu(), gen_samples_con.cpu()
 
     def plot_counterfactuals(self, orig, prob, label, counterfactual, counterfactual_prob, file='', show=True):
         label = int(label)
@@ -517,10 +518,29 @@ class VAETrainer(AETrainer):
         labels = dataset.labels
         probs = dataset.condition.reshape(-1, 1)
         files = dataset.metadata['file']
-        target_probs = np.less(probs, 0.5)
-        counterfactuals = self.generate_counterfactuals(*map(lambda x: torch.from_numpy(x).float(),
-                                                             [matrices, probs, target_probs]))
+        
+        target_strategy = self.settings.get('target', 'opposite')
+        if target_strategy == 'half':
+            target_probs = np.full_like(probs, 0.5)
+        else:
+            target_probs = np.less(probs, 0.5).astype(float)
+
+        counterfactuals, gen_samples_rec, gen_samples_con = self.generate_counterfactuals(*map(lambda x: torch.from_numpy(x).float(),
+                                                                                               [matrices, probs, target_probs]))
+        orig_tensor = torch.from_numpy(matrices).float()
+        mse_before = torch.nn.functional.mse_loss(gen_samples_con, orig_tensor).item()
+        mae_before = torch.nn.functional.l1_loss(gen_samples_con, orig_tensor).item()
+        mse_after = torch.nn.functional.mse_loss(counterfactuals, orig_tensor).item()
+        mae_after = torch.nn.functional.l1_loss(counterfactuals, orig_tensor).item()
+        print('Distance (MSE) before noise cancellation (cleaned): ', mse_before)
+        print('Distance (MAE) before noise cancellation (cleaned): ', mae_before)
+        print('Distance (MSE) after noise cancellation (with noise): ', mse_after)
+        print('Distance (MAE) after noise cancellation (with noise): ', mae_after)
+        
         counterfactuals_prob = model(counterfactuals)
+        print('RMS difference between 0.5 and counterfactual pro: ', np.sqrt(((counterfactuals_prob-0.5)**2).mean()))
+
+        print('RMS difference between prob and counterfactual pro: ', np.sqrt(((counterfactuals_prob-probs)**2).mean()))
         pred = np.greater_equal(probs, 0.5).flatten()
         counterfactuals_pred = np.greater_equal(counterfactuals_prob, 0.5)
         print('Success percentage: ', np.not_equal(pred, counterfactuals_pred).mean())
@@ -550,6 +570,7 @@ def get_trainer(args, final):
         c_reg=args.c_reg,
         data_dir=args.data_dir,
         schedule=CosineSchedule(decay_steps=args.decay_period, min_decay=args.min_decay),
+        target=getattr(args, 'target', 'opposite')
     )
 
     exp_name = '_'.join(filter(bool, args.name.lower().split(' ') + [args.exp]))

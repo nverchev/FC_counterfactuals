@@ -1,4 +1,8 @@
 import os
+import logging
+import requests
+import zipfile
+import pathlib
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -25,22 +29,47 @@ def plot_connectome(fc, data_dir, res, fig, ax):
                                axes=ax)
 
 
+def download_extract_zip(target_folder_path: str, url: str) -> None:
+    target_folder = pathlib.Path(target_folder_path)
+    logging.info(f'Checking if folder exists: {target_folder}')
+
+    if not target_folder.exists():
+        logging.info(f'Folder does not exist. Starting download from: {url}')
+        r = requests.get(url)
+        logging.info(f'Download complete. Size: {len(r.content)} bytes')
+        zip_path = target_folder.with_suffix('.zip')
+        logging.info(f'Saving zip file to: {zip_path}')
+
+        with zip_path.open('wb') as zip_file:
+            zip_file.write(r.content)
+
+        logging.info(f'Zip file saved successfully. Extracting to: {target_folder.parent}')
+        with zipfile.ZipFile(zip_path) as zip_ref:
+            zip_ref.extractall(target_folder.parent)
+
+        logging.info('Extraction complete')
+    else:
+        logging.info(f'Folder already exists at {target_folder}. Skipping download.')
+
+
 def fetch_preprocess(data_dir, res):
     if not os.path.exists(data_dir):
-        os.mkdir(data_dir)
-        dataset = datasets.fetch_abide_pcp(data_dir=data_dir, legacy_format=False)
-        metadata_df = pd.read_csv(os.path.join(data_dir, 'ABIDE_pcp', 'Phenotypic_V1_0b_preprocessed1.csv'))
-        quality_checks = [
-            metadata_df['qc_rater_1'] == 'OK',
-            metadata_df['qc_anat_rater_2'].isin(['OK', 'maybe']),
-            metadata_df['qc_func_rater_2'].isin(['OK', 'maybe']),
-            metadata_df['qc_anat_rater_3'] == 'OK',
-            metadata_df['qc_func_rater_3'] == 'OK'
-        ]
-        metadata_df = metadata_df.loc[np.logical_and.reduce(quality_checks)]
-        metadata_df = metadata_df[['FILE_ID', 'DX_GROUP']].rename(columns={'FILE_ID': 'file', 'DX_GROUP': 'label'})
-        metadata_df['svc_prob'] = metadata_df['mlp_prob'] = metadata_df['ae_prob'] = np.nan
-        metadata_df.to_csv(os.path.join(data_dir, 'metadata.csv'))
+        url = 'https://gaimfs.ugent.be/Public/Dataset/abide_fc_dataset.zip'
+        download_extract_zip(data_dir, url)
+        
+        if not os.path.exists(os.path.join(data_dir, 'metadata.csv')):
+            metadata_df = pd.read_csv(os.path.join(data_dir, 'ABIDE_pcp', 'Phenotypic_V1_0b_preprocessed1.csv'))
+            quality_checks = [
+                metadata_df['qc_rater_1'] == 'OK',
+                metadata_df['qc_anat_rater_2'].isin(['OK', 'maybe']),
+                metadata_df['qc_func_rater_2'].isin(['OK', 'maybe']),
+                metadata_df['qc_anat_rater_3'] == 'OK',
+                metadata_df['qc_func_rater_3'] == 'OK'
+            ]
+            metadata_df = metadata_df.loc[np.logical_and.reduce(quality_checks)]
+            metadata_df = metadata_df[['FILE_ID', 'DX_GROUP']].rename(columns={'FILE_ID': 'file', 'DX_GROUP': 'label'})
+            metadata_df['svc_prob'] = metadata_df['mlp_prob'] = metadata_df['ae_prob'] = np.nan
+            metadata_df.to_csv(os.path.join(data_dir, 'metadata.csv'))
 
     corr_dir = os.path.join(data_dir, 'corr_matrices_' + str(res))
     if not os.path.exists(corr_dir):
