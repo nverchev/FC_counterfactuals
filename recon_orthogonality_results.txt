@@ -1,0 +1,291 @@
+Loaded:  /scratch/dataset/abide_fc_dataset/./models/counterfactual_vae_svc_final/model_epoch1000.pt
+
+==============================================================================
+cond=svc | train_val (seen by the VAE) | target=opposite | n=556
+==============================================================================
+
+[G1] cos(r, d): mean=+0.0050  sd=0.0452
+     donated-residual null: mean=-0.0012  sd=0.0384
+     observed vs null mean: t-test p=1.25e-03   (Cohen d=+0.14)
+     by class: ASD=+0.0139  control=-0.0024  Mann-Whitney p=1.39e-07
+     point-biserial corr(label, cos) = -0.179 (p=2.13e-05)
+
+[G2] component of r along d, as a fraction of d
+     mean=+0.019  95% CI=[+0.006, +0.031]  median=+0.018
+     ||r||/||d|| = 3.86   (mean ||d||=2.287, mean ||r||=8.763)
+
+[G3] classifier response to the same d (0.00% of entries clipped)
+     effect without r (on x_hat)  : mean=-0.402  sd=3.334
+     effect with r    (actual cf) : mean=-0.398  sd=3.295
+     effect with a donated r      : mean=-0.398  sd=3.299
+     attenuation with/without = +0.990   corr(with, without) = +1.000
+     paired difference (with - without): mean=+0.004  p=1.97e-02
+     Spearman(r-along-d, interaction) = -0.197 (p=2.98e-06)
+
+==============================================================================
+cond=svc | train_val (seen by the VAE) | target=half | n=556
+==============================================================================
+
+[G1] cos(r, d): mean=+0.0013  sd=0.0483
+     donated-residual null: mean=-0.0026  sd=0.0390
+     observed vs null mean: t-test p=5.78e-02   (Cohen d=+0.08)
+     by class: ASD=+0.0078  control=-0.0041  Mann-Whitney p=2.29e-05
+     point-biserial corr(label, cos) = -0.123 (p=3.74e-03)
+
+[G2] component of r along d, as a fraction of d
+     mean=-0.006  95% CI=[-0.070, +0.059]  median=+0.015
+     ||r||/||d|| = 12.94   (mean ||d||=0.766, mean ||r||=8.763)
+
+[G3] classifier response to the same d (0.00% of entries clipped)
+     effect without r (on x_hat)  : mean=-0.171  sd=1.124
+     effect with r    (actual cf) : mean=-0.171  sd=1.110
+     effect with a donated r      : mean=-0.169  sd=1.112
+     attenuation with/without = +0.997   corr(with, without) = +1.000
+     paired difference (with - without): mean=+0.001  p=4.95e-01
+     Spearman(r-along-d, interaction) = -0.205 (p=1.09e-06)
+
+==============================================================================
+cond=svc | test (held out) | target=opposite | n=140
+==============================================================================
+
+[G1] cos(r, d): mean=-0.0026  sd=0.0410
+     donated-residual null: mean=-0.0001  sd=0.0411
+     observed vs null mean: t-test p=4.72e-01   (Cohen d=-0.06)
+     by class: ASD=+0.0066  control=-0.0106  Mann-Whitney p=7.78e-03
+     point-biserial corr(label, cos) = -0.209 (p=1.30e-02)
+
+[G2] component of r along d, as a fraction of d
+     mean=+0.000  95% CI=[-0.033, +0.033]  median=-0.014
+     ||r||/||d|| = 4.82   (mean ||d||=2.050, mean ||r||=9.627)
+
+[G3] classifier response to the same d (0.00% of entries clipped)
+     effect without r (on x_hat)  : mean=-0.708  sd=2.972
+     effect with r    (actual cf) : mean=-0.698  sd=2.931
+     effect with a donated r      : mean=-0.700  sd=2.936
+     attenuation with/without = +0.986   corr(with, without) = +1.000
+     paired difference (with - without): mean=+0.010  p=5.98e-03
+     Spearman(r-along-d, interaction) = +0.052 (p=5.41e-01)
+
+==============================================================================
+cond=svc | test (held out) | target=half | n=140
+==============================================================================
+
+[G1] cos(r, d): mean=-0.0068  sd=0.0421
+     donated-residual null: mean=-0.0009  sd=0.0432
+     observed vs null mean: t-test p=9.74e-02   (Cohen d=-0.14)
+     by class: ASD=+0.0010  control=-0.0136  Mann-Whitney p=2.20e-02
+     point-biserial corr(label, cos) = -0.173 (p=4.14e-02)
+
+[G2] component of r along d, as a fraction of d
+     mean=-0.619  95% CI=[-1.648, +0.410]  median=-0.160
+     ||r||/||d|| = 39.63   (mean ||d||=0.536, mean ||r||=9.627)
+
+[G3] classifier response to the same d (0.00% of entries clipped)
+     effect without r (on x_hat)  : mean=-0.244  sd=0.873
+     effect with r    (actual cf) : mean=-0.241  sd=0.860
+     effect with a donated r      : mean=-0.241  sd=0.862
+     attenuation with/without = +0.990   corr(with, without) = +1.000
+     paired difference (with - without): mean=+0.002  p=1.07e-01
+     Spearman(r-along-d, interaction) = +0.028 (p=7.44e-01)
+Loaded:  /scratch/dataset/abide_fc_dataset/./models/counterfactual_vae_mlp_final/model_epoch1000.pt
+
+==============================================================================
+cond=mlp | train_val (seen by the VAE) | target=opposite | n=556
+==============================================================================
+
+[G1] cos(r, d): mean=+0.0034  sd=0.0457
+     donated-residual null: mean=-0.0023  sd=0.0401
+     observed vs null mean: t-test p=3.10e-03   (Cohen d=+0.13)
+     by class: ASD=+0.0165  control=-0.0075  Mann-Whitney p=4.91e-11
+     point-biserial corr(label, cos) = -0.262 (p=3.65e-10)
+
+[G2] component of r along d, as a fraction of d
+     mean=+0.014  95% CI=[+0.001, +0.028]  median=+0.011
+     ||r||/||d|| = 3.99   (mean ||d||=2.280, mean ||r||=8.753)
+
+[G3] classifier response to the same d (0.00% of entries clipped)
+     effect without r (on x_hat)  : mean=-2.498  sd=27.164
+     effect with r    (actual cf) : mean=-2.600  sd=26.920
+     effect with a donated r      : mean=-2.637  sd=26.604
+     attenuation with/without = +1.041   corr(with, without) = +0.997
+     paired difference (with - without): mean=-0.102  p=2.46e-01
+     Spearman(r-along-d, interaction) = -0.203 (p=1.46e-06)
+
+==============================================================================
+cond=mlp | train_val (seen by the VAE) | target=half | n=556
+==============================================================================
+
+[G1] cos(r, d): mean=-0.0005  sd=0.0445
+     donated-residual null: mean=-0.0029  sd=0.0397
+     observed vs null mean: t-test p=1.92e-01   (Cohen d=+0.06)
+     by class: ASD=+0.0081  control=-0.0076  Mann-Whitney p=3.95e-05
+     point-biserial corr(label, cos) = -0.175 (p=3.28e-05)
+
+[G2] component of r along d, as a fraction of d
+     mean=+0.004  95% CI=[-0.035, +0.044]  median=-0.016
+     ||r||/||d|| = 10.23   (mean ||d||=1.047, mean ||r||=8.753)
+
+[G3] classifier response to the same d (0.00% of entries clipped)
+     effect without r (on x_hat)  : mean=-4.348  sd=13.799
+     effect with r    (actual cf) : mean=-2.861  sd=15.048
+     effect with a donated r      : mean=-2.672  sd=14.399
+     attenuation with/without = +0.658   corr(with, without) = +0.920
+     paired difference (with - without): mean=+1.486  p=5.01e-09
+     Spearman(r-along-d, interaction) = -0.013 (p=7.68e-01)
+
+==============================================================================
+cond=mlp | test (held out) | target=opposite | n=140
+==============================================================================
+
+[G1] cos(r, d): mean=-0.0027  sd=0.0336
+     donated-residual null: mean=-0.0021  sd=0.0329
+     observed vs null mean: t-test p=8.33e-01   (Cohen d=-0.02)
+     by class: ASD=+0.0062  control=-0.0104  Mann-Whitney p=2.77e-03
+     point-biserial corr(label, cos) = -0.247 (p=3.24e-03)
+
+[G2] component of r along d, as a fraction of d
+     mean=-0.003  95% CI=[-0.032, +0.025]  median=+0.005
+     ||r||/||d|| = 5.13   (mean ||d||=1.942, mean ||r||=9.612)
+
+[G3] classifier response to the same d (0.00% of entries clipped)
+     effect without r (on x_hat)  : mean=-4.196  sd=23.931
+     effect with r    (actual cf) : mean=-4.607  sd=23.700
+     effect with a donated r      : mean=-4.816  sd=23.788
+     attenuation with/without = +1.098   corr(with, without) = +0.988
+     paired difference (with - without): mean=-0.411  p=1.84e-01
+     Spearman(r-along-d, interaction) = +0.061 (p=4.73e-01)
+
+==============================================================================
+cond=mlp | test (held out) | target=half | n=140
+==============================================================================
+
+[G1] cos(r, d): mean=-0.0031  sd=0.0346
+     donated-residual null: mean=-0.0057  sd=0.0348
+     observed vs null mean: t-test p=3.84e-01   (Cohen d=+0.07)
+     by class: ASD=+0.0032  control=-0.0086  Mann-Whitney p=2.68e-02
+     point-biserial corr(label, cos) = -0.171 (p=4.38e-02)
+
+[G2] component of r along d, as a fraction of d
+     mean=-0.032  95% CI=[-0.133, +0.069]  median=-0.038
+     ||r||/||d|| = 18.60   (mean ||d||=0.707, mean ||r||=9.612)
+
+[G3] classifier response to the same d (0.00% of entries clipped)
+     effect without r (on x_hat)  : mean=-4.351  sd=10.616
+     effect with r    (actual cf) : mean=-2.617  sd=10.191
+     effect with a donated r      : mean=-3.239  sd=10.126
+     attenuation with/without = +0.601   corr(with, without) = +0.929
+     paired difference (with - without): mean=+1.734  p=7.68e-07
+     Spearman(r-along-d, interaction) = -0.140 (p=9.93e-02)
+Loaded:  /scratch/dataset/abide_fc_dataset/./models/counterfactual_vae_ae_final/model_epoch1000.pt
+
+==============================================================================
+cond=ae | train_val (seen by the VAE) | target=opposite | n=556
+==============================================================================
+
+[G1] cos(r, d): mean=+0.0040  sd=0.0403
+     donated-residual null: mean=-0.0012  sd=0.0382
+     observed vs null mean: t-test p=2.42e-03   (Cohen d=+0.13)
+     by class: ASD=+0.0119  control=-0.0025  Mann-Whitney p=2.76e-06
+     point-biserial corr(label, cos) = -0.178 (p=2.35e-05)
+
+[G2] component of r along d, as a fraction of d
+     mean=+0.017  95% CI=[+0.005, +0.030]  median=+0.007
+     ||r||/||d|| = 3.93   (mean ||d||=2.289, mean ||r||=8.765)
+
+[G3] classifier response to the same d (0.00% of entries clipped)
+     effect without r (on x_hat)  : mean=-1.512  sd=19.175
+     effect with r    (actual cf) : mean=-1.521  sd=18.806
+     effect with a donated r      : mean=-1.615  sd=18.895
+     attenuation with/without = +1.006   corr(with, without) = +0.999
+     paired difference (with - without): mean=-0.009  p=8.33e-01
+     Spearman(r-along-d, interaction) = +0.054 (p=2.07e-01)
+
+==============================================================================
+cond=ae | train_val (seen by the VAE) | target=half | n=556
+==============================================================================
+
+[G1] cos(r, d): mean=+0.0030  sd=0.0409
+     donated-residual null: mean=+0.0004  sd=0.0387
+     observed vs null mean: t-test p=1.26e-01   (Cohen d=+0.07)
+     by class: ASD=+0.0095  control=-0.0024  Mann-Whitney p=1.24e-04
+     point-biserial corr(label, cos) = -0.144 (p=6.48e-04)
+
+[G2] component of r along d, as a fraction of d
+     mean=-0.031  95% CI=[-0.176, +0.115]  median=+0.027
+     ||r||/||d|| = 11.87   (mean ||d||=0.925, mean ||r||=8.765)
+
+[G3] classifier response to the same d (0.00% of entries clipped)
+     effect without r (on x_hat)  : mean=-1.258  sd=7.151
+     effect with r    (actual cf) : mean=-1.210  sd=6.938
+     effect with a donated r      : mean=-1.255  sd=7.076
+     attenuation with/without = +0.962   corr(with, without) = +0.996
+     paired difference (with - without): mean=+0.048  p=1.00e-01
+     Spearman(r-along-d, interaction) = -0.008 (p=8.44e-01)
+
+==============================================================================
+cond=ae | test (held out) | target=opposite | n=140
+==============================================================================
+
+[G1] cos(r, d): mean=-0.0031  sd=0.0366
+     donated-residual null: mean=-0.0015  sd=0.0352
+     observed vs null mean: t-test p=5.93e-01   (Cohen d=-0.05)
+     by class: ASD=+0.0041  control=-0.0094  Mann-Whitney p=3.45e-02
+     point-biserial corr(label, cos) = -0.184 (p=2.96e-02)
+
+[G2] component of r along d, as a fraction of d
+     mean=-0.005  95% CI=[-0.035, +0.025]  median=-0.022
+     ||r||/||d|| = 4.98   (mean ||d||=1.988, mean ||r||=9.619)
+
+[G3] classifier response to the same d (0.00% of entries clipped)
+     effect without r (on x_hat)  : mean=-3.001  sd=16.983
+     effect with r    (actual cf) : mean=-3.046  sd=16.789
+     effect with a donated r      : mean=-3.094  sd=16.852
+     attenuation with/without = +1.015   corr(with, without) = +0.998
+     paired difference (with - without): mean=-0.045  p=6.28e-01
+     Spearman(r-along-d, interaction) = +0.364 (p=9.54e-06)
+
+==============================================================================
+cond=ae | test (held out) | target=half | n=140
+==============================================================================
+
+[G1] cos(r, d): mean=-0.0023  sd=0.0380
+     donated-residual null: mean=-0.0037  sd=0.0367
+     observed vs null mean: t-test p=6.54e-01   (Cohen d=+0.04)
+     by class: ASD=+0.0035  control=-0.0073  Mann-Whitney p=7.17e-02
+     point-biserial corr(label, cos) = -0.142 (p=9.33e-02)
+
+[G2] component of r along d, as a fraction of d
+     mean=+0.081  95% CI=[-0.060, +0.222]  median=-0.081
+     ||r||/||d|| = 21.46   (mean ||d||=0.641, mean ||r||=9.619)
+
+[G3] classifier response to the same d (0.00% of entries clipped)
+     effect without r (on x_hat)  : mean=-1.592  sd=5.600
+     effect with r    (actual cf) : mean=-1.485  sd=5.447
+     effect with a donated r      : mean=-1.573  sd=5.491
+     attenuation with/without = +0.933   corr(with, without) = +0.998
+     paired difference (with - without): mean=+0.107  p=2.38e-03
+     Spearman(r-along-d, interaction) = +0.011 (p=9.00e-01)
+
+==============================================================================
+SUMMARY   H0: the residual is uncorrelated with the counterfactual change
+==============================================================================
+cond partition  target      cos(r,d)     null  r along d  attenuat.  corr w/wo  corr(y,cos)
+-------------------------------------------------------------------------------------------
+svc  train      opposite     +0.0050  -0.0012     +0.019     +0.990     +1.000       -0.179
+svc  train      half         +0.0013  -0.0026     -0.006     +0.997     +1.000       -0.123
+svc  test       opposite     -0.0026  -0.0001     +0.000     +0.986     +1.000       -0.209
+svc  test       half         -0.0068  -0.0009     -0.619     +0.990     +1.000       -0.173
+mlp  train      opposite     +0.0034  -0.0023     +0.014     +1.041     +0.997       -0.262
+mlp  train      half         -0.0005  -0.0029     +0.004     +0.658     +0.920       -0.175
+mlp  test       opposite     -0.0027  -0.0021     -0.003     +1.098     +0.988       -0.247
+mlp  test       half         -0.0031  -0.0057     -0.032     +0.601     +0.929       -0.171
+ae   train      opposite     +0.0040  -0.0012     +0.017     +1.006     +0.999       -0.178
+ae   train      half         +0.0030  +0.0004     -0.031     +0.962     +0.996       -0.144
+ae   test       opposite     -0.0031  -0.0015     -0.005     +1.015     +0.998       -0.184
+ae   test       half         -0.0023  -0.0037     +0.081     +0.933     +0.998       -0.142
+
+cos(r,d)    alignment of the residual with the intervention (0 under H0; compare to null)
+r along d   residual's component along d in units of d (0 under H0; -1 = cancels d entirely)
+attenuat.   mean classifier effect of d with the residual / without it (1 under H0)
+corr w/wo   per-subject correlation of those two effects (1 under H0)
+corr(y,cos) does the alignment depend on the subject's class? (0 under H0)

@@ -1,0 +1,260 @@
+Loaded:  /scratch/dataset/abide_fc_dataset/./models/counterfactual_vae_svc_final/model_epoch1000.pt
+
+==============================================================================
+cond=svc  |  train_val (seen by the VAE)  |  n=556  |  recon MSE=0.01054
+==============================================================================
+
+[T1] Decoding the diagnosis label (5-fold CV AUC)
+    original x               logreg AUC=0.730   rbf-SVC AUC=0.688
+    reconstruction x_hat     logreg AUC=0.999   rbf-SVC AUC=0.991
+    residual r = x - x_hat   logreg AUC=0.012   rbf-SVC AUC=0.046
+    label-permutation null for r (200 perms): mean=0.500 sd=0.033  -> two-sided p=0.005
+    NOTE: AUC far *below* chance. With p >> n and residuals whose within-class mean
+          is near zero, a held-out sample is anti-correlated with the sum of its own
+          class in the training fold ("anti-learning"): the fitted decoder inverts.
+          Read T1b/T4-swap instead, which are immune to this.
+
+[T1b] Projection on a class axis fitted on independent ORIGINAL data
+    (5-fold CV axis from originals)
+    x      AUC=0.585   Mann-Whitney p=5.94e-04   mean(ASD)=+8.975  mean(control)=+9.872
+    x_hat  AUC=0.621   Mann-Whitney p=8.10e-07   mean(ASD)=+8.660  mean(control)=+9.983
+    r      AUC=0.129   Mann-Whitney p=1.85e-51   mean(ASD)=+0.315  mean(control)=-0.112
+
+[T2] Decoding the conditioning probability from r (ridge, 5-fold CV R^2)
+    from x : R^2= 0.463
+    from r : R^2=-0.017   (permutation null mean=-0.005, p=0.980)
+
+[T3] Magnitude of the reconstruction error vs class
+    per-sample MSE: ASD=0.01075  control=0.01036  Mann-Whitney p=0.180
+    Spearman(MSE, conditioning prob) = -0.081  (p=0.057)
+
+[T4] Does r carry class signal *the conditioning classifier uses*?
+    AUC(clf | x)     = 1.000      AUC(clf | x_hat) = 1.000
+    logit shift from adding r, signed towards the true class: mean=-0.016  (t-test p=2.75e-03)
+    residual swap (20 derangements):
+        AUC(injected logit shift -> DONOR label)     = 0.298 +- 0.007
+        AUC(injected logit shift -> recipient label) = 0.433 +- 0.019
+        AUC(clf | x_hat + donated r) = 0.999 +- 0.000   (vs 1.000 with no r at all)
+
+[T5] Cost of transplanting r onto the counterfactual
+    target=opposite  mean prob 0.461 (clean x_hat*) -> 0.461 (+r)   |   flip rate 100.0% -> 100.0%   |   rank corr(p) = 0.857
+                     logit pull back towards the true class from r: mean= 0.023 (p=1.53e-05)
+    target=half      mean prob 0.505 (clean x_hat*) -> 0.504 (+r)   |   flip rate 40.5% -> 46.9%   |   rank corr(p) = 0.137
+                     logit pull back towards the true class from r: mean=-0.002 (p=7.51e-01)
+
+==============================================================================
+cond=svc  |  test (held out)  |  n=140  |  recon MSE=0.01276
+==============================================================================
+
+[T1] Decoding the diagnosis label (5-fold CV AUC)
+    original x               logreg AUC=0.630   rbf-SVC AUC=0.542
+    reconstruction x_hat     logreg AUC=0.585   rbf-SVC AUC=0.507
+    residual r = x - x_hat   logreg AUC=0.604   rbf-SVC AUC=0.603
+    label-permutation null for r (200 perms): mean=0.493 sd=0.067  -> two-sided p=0.104
+
+[T1b] Projection on a class axis fitted on independent ORIGINAL data
+    (axis from train_val originals)
+    x      AUC=0.583   Mann-Whitney p=9.14e-02   mean(ASD)=+9.764  mean(control)=+10.623
+    x_hat  AUC=0.567   Mann-Whitney p=1.76e-01   mean(ASD)=+9.820  mean(control)=+10.522
+    r      AUC=0.620   Mann-Whitney p=1.49e-02   mean(ASD)=-0.057  mean(control)=+0.102
+
+[T2] Decoding the conditioning probability from r (ridge, 5-fold CV R^2)
+    from x : R^2= 0.423
+    from r : R^2=-0.026   (permutation null mean=-0.031, p=0.451)
+
+[T3] Magnitude of the reconstruction error vs class
+    per-sample MSE: ASD=0.01277  control=0.01275  Mann-Whitney p=0.780
+    Spearman(MSE, conditioning prob) =  0.020  (p=0.814)
+
+[T4] Does r carry class signal *the conditioning classifier uses*?
+    AUC(clf | x)     = 0.701      AUC(clf | x_hat) = 0.705
+    logit shift from adding r, signed towards the true class: mean=-0.000  (t-test p=9.88e-01)
+    residual swap (20 derangements):
+        AUC(injected logit shift -> DONOR label)     = 0.512 +- 0.013
+        AUC(injected logit shift -> recipient label) = 0.469 +- 0.042
+        AUC(clf | x_hat + donated r) = 0.700 +- 0.006   (vs 0.705 with no r at all)
+
+[T5] Cost of transplanting r onto the counterfactual
+    target=opposite  mean prob 0.420 (clean x_hat*) -> 0.421 (+r)   |   flip rate 100.0% -> 100.0%   |   rank corr(p) = 0.802
+                     logit pull back towards the true class from r: mean= 0.011 (p=2.15e-01)
+    target=half      mean prob 0.507 (clean x_hat*) -> 0.506 (+r)   |   flip rate 36.4% -> 63.6%   |   rank corr(p) = -0.084
+                     logit pull back towards the true class from r: mean= 0.004 (p=6.42e-01)
+Loaded:  /scratch/dataset/abide_fc_dataset/./models/counterfactual_vae_mlp_final/model_epoch1000.pt
+
+==============================================================================
+cond=mlp  |  train_val (seen by the VAE)  |  n=556  |  recon MSE=0.01052
+==============================================================================
+
+[T1] Decoding the diagnosis label (5-fold CV AUC)
+    original x               logreg AUC=0.730   rbf-SVC AUC=0.688
+    reconstruction x_hat     logreg AUC=0.999   rbf-SVC AUC=0.987
+    residual r = x - x_hat   logreg AUC=0.010   rbf-SVC AUC=0.038
+    label-permutation null for r (200 perms): mean=0.500 sd=0.032  -> two-sided p=0.005
+    NOTE: AUC far *below* chance. With p >> n and residuals whose within-class mean
+          is near zero, a held-out sample is anti-correlated with the sum of its own
+          class in the training fold ("anti-learning"): the fitted decoder inverts.
+          Read T1b/T4-swap instead, which are immune to this.
+
+[T1b] Projection on a class axis fitted on independent ORIGINAL data
+    (5-fold CV axis from originals)
+    x      AUC=0.585   Mann-Whitney p=5.94e-04   mean(ASD)=+8.975  mean(control)=+9.872
+    x_hat  AUC=0.620   Mann-Whitney p=1.04e-06   mean(ASD)=+8.619  mean(control)=+9.933
+    r      AUC=0.109   Mann-Whitney p=9.81e-57   mean(ASD)=+0.356  mean(control)=-0.061
+
+[T2] Decoding the conditioning probability from r (ridge, 5-fold CV R^2)
+    from x : R^2= 0.463
+    from r : R^2=-0.017   (permutation null mean=-0.005, p=0.980)
+
+[T3] Magnitude of the reconstruction error vs class
+    per-sample MSE: ASD=0.01069  control=0.01038  Mann-Whitney p=0.248
+    Spearman(MSE, conditioning prob) = -0.075  (p=0.076)
+
+[T4] Does r carry class signal *the conditioning classifier uses*?
+    AUC(clf | x)     = 1.000      AUC(clf | x_hat) = 1.000
+    logit shift from adding r, signed towards the true class: mean= 0.038  (t-test p=6.63e-01)
+    residual swap (20 derangements):
+        AUC(injected logit shift -> DONOR label)     = 0.490 +- 0.016
+        AUC(injected logit shift -> recipient label) = 0.354 +- 0.014
+        AUC(clf | x_hat + donated r) = 0.998 +- 0.001   (vs 1.000 with no r at all)
+
+[T5] Cost of transplanting r onto the counterfactual
+    target=opposite  mean prob 0.451 (clean x_hat*) -> 0.451 (+r)   |   flip rate 100.0% -> 100.0%   |   rank corr(p) = 0.956
+                     logit pull back towards the true class from r: mean= 0.002 (p=3.18e-01)
+    target=half      mean prob 0.214 (clean x_hat*) -> 0.414 (+r)   |   flip rate 54.0% -> 57.6%   |   rank corr(p) = 0.385
+                     logit pull back towards the true class from r: mean=-0.130 (p=6.45e-01)
+
+==============================================================================
+cond=mlp  |  test (held out)  |  n=140  |  recon MSE=0.01272
+==============================================================================
+
+[T1] Decoding the diagnosis label (5-fold CV AUC)
+    original x               logreg AUC=0.630   rbf-SVC AUC=0.542
+    reconstruction x_hat     logreg AUC=0.573   rbf-SVC AUC=0.532
+    residual r = x - x_hat   logreg AUC=0.608   rbf-SVC AUC=0.601
+    label-permutation null for r (200 perms): mean=0.493 sd=0.067  -> two-sided p=0.100
+
+[T1b] Projection on a class axis fitted on independent ORIGINAL data
+    (axis from train_val originals)
+    x      AUC=0.583   Mann-Whitney p=9.14e-02   mean(ASD)=+9.764  mean(control)=+10.623
+    x_hat  AUC=0.570   Mann-Whitney p=1.55e-01   mean(ASD)=+9.726  mean(control)=+10.457
+    r      AUC=0.629   Mann-Whitney p=8.80e-03   mean(ASD)=+0.037  mean(control)=+0.166
+
+[T2] Decoding the conditioning probability from r (ridge, 5-fold CV R^2)
+    from x : R^2= 0.423
+    from r : R^2=-0.040   (permutation null mean=-0.031, p=0.765)
+
+[T3] Magnitude of the reconstruction error vs class
+    per-sample MSE: ASD=0.01273  control=0.01271  Mann-Whitney p=0.789
+    Spearman(MSE, conditioning prob) =  0.023  (p=0.784)
+
+[T4] Does r carry class signal *the conditioning classifier uses*?
+    AUC(clf | x)     = 0.689      AUC(clf | x_hat) = 0.694
+    logit shift from adding r, signed towards the true class: mean=-0.023  (t-test p=9.40e-01)
+    residual swap (20 derangements):
+        AUC(injected logit shift -> DONOR label)     = 0.515 +- 0.032
+        AUC(injected logit shift -> recipient label) = 0.464 +- 0.045
+        AUC(clf | x_hat + donated r) = 0.682 +- 0.014   (vs 0.694 with no r at all)
+
+[T5] Cost of transplanting r onto the counterfactual
+    target=opposite  mean prob 0.400 (clean x_hat*) -> 0.400 (+r)   |   flip rate 100.0% -> 100.0%   |   rank corr(p) = 0.946
+                     logit pull back towards the true class from r: mean= 0.000 (p=nan)
+    target=half      mean prob 0.203 (clean x_hat*) -> 0.448 (+r)   |   flip rate 53.6% -> 47.1%   |   rank corr(p) = 0.430
+                     logit pull back towards the true class from r: mean= 0.462 (p=3.65e-01)
+Loaded:  /scratch/dataset/abide_fc_dataset/./models/counterfactual_vae_ae_final/model_epoch1000.pt
+
+==============================================================================
+cond=ae  |  train_val (seen by the VAE)  |  n=556  |  recon MSE=0.01055
+==============================================================================
+
+[T1] Decoding the diagnosis label (5-fold CV AUC)
+    original x               logreg AUC=0.730   rbf-SVC AUC=0.688
+    reconstruction x_hat     logreg AUC=0.999   rbf-SVC AUC=0.990
+    residual r = x - x_hat   logreg AUC=0.007   rbf-SVC AUC=0.035
+    label-permutation null for r (200 perms): mean=0.500 sd=0.033  -> two-sided p=0.005
+    NOTE: AUC far *below* chance. With p >> n and residuals whose within-class mean
+          is near zero, a held-out sample is anti-correlated with the sum of its own
+          class in the training fold ("anti-learning"): the fitted decoder inverts.
+          Read T1b/T4-swap instead, which are immune to this.
+
+[T1b] Projection on a class axis fitted on independent ORIGINAL data
+    (5-fold CV axis from originals)
+    x      AUC=0.585   Mann-Whitney p=5.94e-04   mean(ASD)=+8.975  mean(control)=+9.872
+    x_hat  AUC=0.621   Mann-Whitney p=8.96e-07   mean(ASD)=+8.653  mean(control)=+9.976
+    r      AUC=0.111   Mann-Whitney p=2.17e-56   mean(ASD)=+0.322  mean(control)=-0.104
+
+[T2] Decoding the conditioning probability from r (ridge, 5-fold CV R^2)
+    from x : R^2= 0.463
+    from r : R^2=-0.017   (permutation null mean=-0.005, p=0.980)
+
+[T3] Magnitude of the reconstruction error vs class
+    per-sample MSE: ASD=0.01075  control=0.01039  Mann-Whitney p=0.167
+    Spearman(MSE, conditioning prob) = -0.086  (p=0.044)
+
+[T4] Does r carry class signal *the conditioning classifier uses*?
+    AUC(clf | x)     = 1.000      AUC(clf | x_hat) = 1.000
+    logit shift from adding r, signed towards the true class: mean=-0.138  (t-test p=5.59e-02)
+    residual swap (20 derangements):
+        AUC(injected logit shift -> DONOR label)     = 0.434 +- 0.005
+        AUC(injected logit shift -> recipient label) = 0.465 +- 0.020
+        AUC(clf | x_hat + donated r) = 0.999 +- 0.000   (vs 1.000 with no r at all)
+
+[T5] Cost of transplanting r onto the counterfactual
+    target=opposite  mean prob 0.451 (clean x_hat*) -> 0.451 (+r)   |   flip rate 100.0% -> 100.0%   |   rank corr(p) = 0.929
+                     logit pull back towards the true class from r: mean= 0.134 (p=3.71e-03)
+    target=half      mean prob 0.391 (clean x_hat*) -> 0.440 (+r)   |   flip rate 48.6% -> 54.7%   |   rank corr(p) = 0.506
+                     logit pull back towards the true class from r: mean= 0.067 (p=4.55e-01)
+
+==============================================================================
+cond=ae  |  test (held out)  |  n=140  |  recon MSE=0.01274
+==============================================================================
+
+[T1] Decoding the diagnosis label (5-fold CV AUC)
+    original x               logreg AUC=0.630   rbf-SVC AUC=0.542
+    reconstruction x_hat     logreg AUC=0.562   rbf-SVC AUC=0.522
+    residual r = x - x_hat   logreg AUC=0.602   rbf-SVC AUC=0.597
+    label-permutation null for r (200 perms): mean=0.492 sd=0.067  -> two-sided p=0.109
+
+[T1b] Projection on a class axis fitted on independent ORIGINAL data
+    (axis from train_val originals)
+    x      AUC=0.583   Mann-Whitney p=9.14e-02   mean(ASD)=+9.764  mean(control)=+10.623
+    x_hat  AUC=0.566   Mann-Whitney p=1.80e-01   mean(ASD)=+9.806  mean(control)=+10.499
+    r      AUC=0.640   Mann-Whitney p=4.26e-03   mean(ASD)=-0.042  mean(control)=+0.124
+
+[T2] Decoding the conditioning probability from r (ridge, 5-fold CV R^2)
+    from x : R^2= 0.423
+    from r : R^2=-0.028   (permutation null mean=-0.030, p=0.588)
+
+[T3] Magnitude of the reconstruction error vs class
+    per-sample MSE: ASD=0.01273  control=0.01274  Mann-Whitney p=0.815
+    Spearman(MSE, conditioning prob) =  0.026  (p=0.756)
+
+[T4] Does r carry class signal *the conditioning classifier uses*?
+    AUC(clf | x)     = 0.698      AUC(clf | x_hat) = 0.701
+    logit shift from adding r, signed towards the true class: mean= 0.180  (t-test p=2.38e-01)
+    residual swap (20 derangements):
+        AUC(injected logit shift -> DONOR label)     = 0.568 +- 0.008
+        AUC(injected logit shift -> recipient label) = 0.496 +- 0.046
+        AUC(clf | x_hat + donated r) = 0.689 +- 0.013   (vs 0.701 with no r at all)
+
+[T5] Cost of transplanting r onto the counterfactual
+    target=opposite  mean prob 0.400 (clean x_hat*) -> 0.400 (+r)   |   flip rate 100.0% -> 100.0%   |   rank corr(p) = 0.927
+                     logit pull back towards the true class from r: mean= 0.123 (p=1.52e-01)
+    target=half      mean prob 0.378 (clean x_hat*) -> 0.447 (+r)   |   flip rate 47.9% -> 46.4%   |   rank corr(p) = 0.627
+                     logit pull back towards the true class from r: mean= 0.239 (p=1.55e-01)
+
+==============================================================================
+SUMMARY   H0: the reconstruction error carries no class-relevant information
+==============================================================================
+cond partition   AUC(y|r)      p  projAUC r  projAUC x  R2(p|r)  AUC(y|x)  AUC(y|xh)   swap   pull
+--------------------------------------------------------------------------------------------------
+svc  train          0.012  0.005      0.129      0.585   -0.017     1.000      1.000  0.298  -0.02
+svc  test           0.604  0.104      0.620      0.583   -0.026     0.701      0.705  0.512  -0.00
+mlp  train          0.010  0.005      0.109      0.585   -0.017     1.000      1.000  0.490   0.04
+mlp  test           0.608  0.100      0.629      0.583   -0.040     0.689      0.694  0.515  -0.02
+ae   train          0.007  0.005      0.111      0.585   -0.017     1.000      1.000  0.434  -0.14
+ae   test           0.602  0.109      0.640      0.583   -0.028     0.698      0.701  0.568   0.18
+
+projAUC = label AUC of the projection on a class axis fitted on independent originals
+          (T1b; 0.5 under H0).  swap = AUC of the logit shift injected by a *donated*
+          residual against the DONOR label (0.5 under H0).  pull = mean logit shift the
+          residual gives the conditioning classifier towards the subject's true class.
