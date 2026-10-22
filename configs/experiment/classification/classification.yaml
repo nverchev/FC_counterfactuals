@@ -1,0 +1,9 @@
+defaults:
+  - train: train
+  - _self_
+
+# rescaling of the probabilities that condition the VAE, see src.data.conditions.rescale
+rescale_steps:
+  svc: 0
+  mlp: 4
+  ae: 2

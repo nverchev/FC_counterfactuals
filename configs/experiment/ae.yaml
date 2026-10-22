@@ -1,0 +1,11 @@
+defaults:
+  - data: data
+  - classification: classification
+  - classification/model@classification.model: ae
+  - autoencoding: autoencoding
+  - counterfactual: counterfactual
+  - user: user
+  - _self_
+
+variation: null  # null = the current git branch
+final: false

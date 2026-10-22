@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Install uv and set the Python version
+      uses: astral-sh/setup-uv@v7
+      with:
+        python-version: "3.13"
+        enable-cache: true
+
+    - name: Lock dependencies
+      run: uv lock
+
+    - name: Install the project
+      run: uv sync --all-extras --dev
+
+    - name: Install Linters and Type Checkers
+      run: uv pip install ruff basedpyright
+
+    - name: Ruff Lint
+      run: uv run ruff check --diff .
+
+    - name: Ruff Format
+      run: uv run ruff format --check .
+
+    - name: BasedPyright
+      run: uv run basedpyright
+
+    - name: Run tests
+      run: uv run pytest
+

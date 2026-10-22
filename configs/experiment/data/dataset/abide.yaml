@@ -1,0 +1,5 @@
+name: abide
+folder: abide_fc_dataset
+test_fraction: 0.2
+val_fraction: 0.2
+split_seed: 2023

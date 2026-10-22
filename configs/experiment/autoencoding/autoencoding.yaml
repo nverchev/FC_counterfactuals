@@ -1,0 +1,6 @@
+defaults:
+  - train: train
+  - _self_
+
+model:
+  name: autoencoder

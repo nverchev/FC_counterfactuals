@@ -1,0 +1,11 @@
+defaults:
+  - train: train
+  - _self_
+
+model:
+  name: counterfactual_vae
+  hidden_dims: [512, 256]
+  z_dim: 32
+
+objective:
+  c_kld: 5e-5

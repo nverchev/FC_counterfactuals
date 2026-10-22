@@ -1,0 +1,21 @@
+batch_size: 64
+n_epochs: 150
+
+learn:
+  optimizer: AdamW
+  lr: 1e-3
+  grad_op: null
+  clip_criterion: null
+  opt_settings:
+    weight_decay: 1e-5
+  scheduler:
+    function: constant
+    restart_interval: 0
+    restart_fraction: 1.0
+    warmup_steps: 0
+    settings: {}
+
+early_stopping:
+  active: false
+  window: 5
+  patience: 20

@@ -1,0 +1,4 @@
+name: svc
+kernel: rbf
+c: 100
+gamma: auto

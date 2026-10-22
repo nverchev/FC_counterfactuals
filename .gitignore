@@ -1,2 +1,13 @@
-/dataset_path.txt
-__pycache__
+**/__pycache__
+*pyc
+/data/
+experiments*/
+optimization_db/
+outputs/
+.agent/
+.claude/
+.env
+.idea/
+.vscode/
+wandb
+images/

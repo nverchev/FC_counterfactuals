@@ -1,0 +1,6 @@
+# the MLP whose encoder starts from the weights of the pretrained autoencoder
+defaults:
+  - mlp
+  - _self_
+
+name: ae
