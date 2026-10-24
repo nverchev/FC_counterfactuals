@@ -15,10 +15,9 @@ from src.trackers import get_trackers
 from src.config.environment import DEBUG_MODE
 from src.data import get_splits
 from src.lib import get_loaders
-from src.data.conditions import condition_split
-from src.utils.counterfactuals import evaluate_counterfactuals
-from src.lib.models import get_counterfactual_model, load_classifier_probability, load_trained_state
-from src.lib.objectives import get_vae_loss
+from src.data.derived_datasets import ConditionedSplit, CounterfactualSplit, load_classifier
+from src.lib.models import get_counterfactual_model, load_trained_state
+from src.lib.objectives import get_counterfactual_metrics, get_vae_loss
 
 
 def evaluate() -> None:
@@ -29,9 +28,9 @@ def evaluate() -> None:
         ``Counterfactual_<target>``, and of the denoised ones, as ``Denoised_counterfactual_<target>``.
     """
     cfg = Experiment.get_config()
-    probability = load_classifier_probability()
+    classifier = load_classifier()
     _, eval_split = get_splits()
-    eval_split = condition_split(probability, eval_split)
+    eval_split = ConditionedSplit(eval_split, classifier)
     model = get_counterfactual_model()
     load_trained_state(model, epoch=cfg.user.load or -1)
 
@@ -39,16 +38,19 @@ def evaluate() -> None:
     Test(model, loader=eval_loader, metric=get_vae_loss(), name='Reconstruction')()
     module = model.module
     for target in CounterfactualTargets:
-        noisy = evaluate_counterfactuals(module, probability, eval_split, denoise=False, target=target)
+        noisy = CounterfactualSplit(eval_split, module, classifier, denoise=False, target=target)
         log_events.MetricEvent(
-            model_name=model.name, source_name=f'Counterfactual_{target}', epoch=model.epoch, metrics=noisy.metrics
+            model_name=model.name,
+            source_name=f'Counterfactual_{target}',
+            epoch=model.epoch,
+            metrics=get_counterfactual_metrics(eval_split, noisy),
         )
-        denoised = evaluate_counterfactuals(module, probability, eval_split, denoise=True, target=target)
+        denoised = CounterfactualSplit(eval_split, module, classifier, denoise=True, target=target)
         log_events.MetricEvent(
             model_name=model.name,
             source_name=f'Denoised_counterfactual_{target}',
             epoch=model.epoch,
-            metrics=denoised.metrics,
+            metrics=get_counterfactual_metrics(eval_split, denoised),
         )
 
     return

@@ -1,10 +1,9 @@
-"""Fitting, saving and loading of the support vector classifier, a scikit-learn model."""
+"""Support vector classifier: fitting, saving, loading and probabilities."""
 
 import logging
 import pathlib
 
-from collections.abc import Callable
-from typing import cast
+from typing import Final, cast
 
 import joblib
 import torch
@@ -17,12 +16,43 @@ from src.config.options import Classifiers
 from src.data.split import DataSplit
 
 __all__ = [
+    'SVCClassifier',
     'fit_and_save_svc',
     'get_svc_confusion_matrix',
     'get_svc_path',
     'load_svc',
-    'load_svc_probability',
 ]
+
+
+class SVCClassifier:
+    """Fitted support vector classifier giving the probability of typical development.
+
+    Attributes:
+        svc: The fitted classifier.
+    """
+
+    svc: Final[CalibratedClassifierCV]
+
+    def __init__(self, svc: CalibratedClassifierCV, /) -> None:
+        """Initialize.
+
+        Args:
+            svc: the fitted classifier.
+        """
+        self.svc = svc
+        return
+
+    def probability(self, features: torch.Tensor, /) -> torch.Tensor:
+        """Get the probability of typical development.
+
+        Args:
+            features: connections ``(N, n_features)``.
+
+        Returns:
+            The probabilities ``(N, 1)``, on the device of the features.
+        """
+        probabilities = self.svc.predict_proba(features.cpu().double().numpy())[:, 1]
+        return torch.from_numpy(probabilities).float().unsqueeze(1).to(features.device)
 
 
 def fit_and_save_svc(split: DataSplit, /) -> CalibratedClassifierCV:
@@ -91,22 +121,3 @@ def load_svc() -> CalibratedClassifierCV:
         raise RuntimeError(msg)
 
     return cast(CalibratedClassifierCV, joblib.load(path))
-
-
-def load_svc_probability() -> Callable[[torch.Tensor], torch.Tensor]:
-    """Load the support vector classifier of the experiment and get its probability of typical development.
-
-    Returns:
-        A function from the connections ``(N, n_features)`` to the probabilities ``(N, 1)``, on
-        the same device.
-
-    Raises:
-        RuntimeError: if the experiment holds no trained support vector classifier.
-    """
-    svc = load_svc()
-
-    def _probability(features: torch.Tensor) -> torch.Tensor:
-        probabilities = svc.predict_proba(features.cpu().double().numpy())[:, 1]
-        return torch.from_numpy(probabilities).float().unsqueeze(1).to(features.device)
-
-    return _probability

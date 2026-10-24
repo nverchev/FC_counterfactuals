@@ -5,8 +5,25 @@ import math
 import pytest
 import torch
 
+from src.config.options import CounterfactualTargets
+from src.data.abide import N_FEATURES
+from src.data.derived_datasets import ConditionedSplit, CounterfactualSplit
+from src.data.split import DataSplit
 from src.data.structures import Outputs, Targets
-from src.lib.objectives import BinaryClassMetrics, get_accuracy, get_kld, get_mse
+from src.lib.objectives import BinaryClassMetrics, get_accuracy, get_counterfactual_metrics, get_kld, get_mse
+from src.module import CounterfactualVAE
+
+
+class _Classifier:
+    probabilities: torch.Tensor
+
+    def __init__(self, probabilities: torch.Tensor) -> None:
+        self.probabilities = probabilities
+        return
+
+    def probability(self, features: torch.Tensor, /) -> torch.Tensor:
+        _not_used = features
+        return self.probabilities
 
 
 def _get_targets(labels: list[float]) -> Targets:
@@ -85,3 +102,22 @@ class TestBinaryClassMetrics:
         matrix = metrics.confusion_matrix
 
         torch.testing.assert_close(matrix, torch.tensor([[2.0, 1.0], [0.0, 2.0]]))
+
+
+def test_get_counterfactual_metrics() -> None:
+    """A classifier that always answers 0.9 flips exactly the subjects conditioned below 0.5."""
+    original = DataSplit(torch.rand(4, N_FEATURES) * 2 - 1, torch.zeros(4, 1))
+    split = ConditionedSplit(original, _Classifier(torch.tensor([[0.2], [0.8], [0.3], [0.6]])))
+    counterfactuals = CounterfactualSplit(
+        split,
+        CounterfactualVAE(),
+        _Classifier(torch.full((4, 1), 0.9)),
+        denoise=True,
+        target=CounterfactualTargets.OPPOSITE,
+    )
+
+    metrics = get_counterfactual_metrics(split, counterfactuals)
+
+    assert metrics['Success'] == 0.5
+    assert abs(metrics['RMS_from_half'] - 0.4) < 1e-6
+    assert abs(metrics['MSE'] - (counterfactuals.features - split.features).pow(2).mean().item()) < 1e-6

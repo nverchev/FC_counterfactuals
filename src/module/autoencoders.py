@@ -12,7 +12,7 @@ import torch.nn as nn
 from src.data.abide import N_FEATURES
 from src.config.experiment import Experiment
 from src.data.structures import Inputs, Outputs
-from src.module.classifier import BaseEncoderArchitecture
+from src.module.classifiers import BaseEncoderArchitecture
 
 __all__ = [
     'Autoencoder',

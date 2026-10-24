@@ -1,22 +1,16 @@
-"""Loading of a trained experiment for the analyses of the reconstruction error."""
+"""Trained counterfactual VAE and classifier, with NumPy inputs, for the analyses of the reconstruction error."""
 
 import dataclasses
-import pathlib
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from typing import cast
 
 import numpy as np
 import torch
 
-from src.config import ExperimentConfig, Experiment, get_experiment_config
-from src.data import get_splits
 from src.module import CounterfactualVAE
-from src.data.conditions import condition_split
-from src.lib.models import load_classifier_probability
 
 __all__ = [
     'AnalysisSetup',
-    'load_setup',
 ]
 
 
@@ -83,45 +77,3 @@ class AnalysisSetup:
         condition = torch.from_numpy(conditions).float().view(-1, 1).to(device)
         encoding = self.module.encode(x, condition)
         return self.module.decode(encoding.z, condition, encoding.hidden).recon.cpu().numpy()
-
-
-def load_setup(classifier: str, overrides: Sequence[str] = ('final=true',)) -> AnalysisSetup:
-    """Load the trained counterfactual VAE conditioned on a classifier.
-
-    Args:
-        classifier: the conditioning classifier, which names the entry configuration: ``svc``, ``mlp`` or ``ae``.
-        overrides: the Hydra overrides the models were trained with.
-
-    Returns:
-        The models and the partitions of the experiment.
-
-    Raises:
-        RuntimeError: if the experiment holds no trained models.
-    """
-    cfg = get_experiment_config(classifier, overrides=list(overrides))
-    exp = Experiment(cfg, name=cfg.name, par_dir=cfg.par_dir)
-    with exp.create_run(resume=True, record=False):
-        probability = load_classifier_probability()
-        train_split, test_split = get_splits()
-        splits = {'train': condition_split(probability, train_split), 'test': condition_split(probability, test_split)}
-
-        # drytorch numbers a repeated model name in a process, so the weights are read directly
-        module = CounterfactualVAE()
-        module.load_state_dict(torch.load(_get_last_state(cfg), map_location='cpu', weights_only=True))
-
-    partitions = {
-        name: (split.features.numpy(), split.labels.squeeze(1).long().numpy(), split.conditions.squeeze(1).numpy())
-        for name, split in splits.items()
-    }
-    return AnalysisSetup(module=module.eval(), probability=probability, partitions=partitions)
-
-
-def _get_last_state(cfg: ExperimentConfig) -> pathlib.Path:
-    # the checkpoints are in <run name>/<date>/<time>/<model name>/epoch_<epoch>
-    model_dirs = sorted((cfg.par_dir / 'checkpoints' / cfg.name).glob(f'*/*/{cfg.counterfactual.model.name}'))
-    epoch_dirs = list(model_dirs[-1].glob('epoch_*')) if model_dirs else []
-    if not epoch_dirs:
-        msg = f"No trained counterfactual VAE in the experiment '{cfg.name}': train it first."
-        raise RuntimeError(msg)
-
-    return max(epoch_dirs, key=lambda path: int(path.name.removeprefix('epoch_'))) / 'model_state.pt'

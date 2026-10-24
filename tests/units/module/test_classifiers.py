@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from src.data.structures import Inputs
 from src.module import autoencoders
-from src.module.classifier import BaseEncoderArchitecture, MLPClassifier
+from src.module.classifiers import BaseEncoderArchitecture, MLPClassifier
 
 from src.data.abide import N_FEATURES
 

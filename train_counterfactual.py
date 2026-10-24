@@ -14,9 +14,9 @@ from src.trackers import get_trackers
 from src.config.environment import DEBUG_MODE
 from src.data import get_splits
 from src.lib import get_learning_schema, get_loaders
-from src.data.conditions import condition_split
+from src.data.derived_datasets import ConditionedSplit, load_classifier
 from src.lib.hooks import register_checkpointing
-from src.lib.models import get_counterfactual_model, load_classifier_probability
+from src.lib.models import get_counterfactual_model
 from src.lib.objectives import get_vae_loss
 
 
@@ -25,9 +25,9 @@ def train_counterfactual() -> None:
     cfg = Experiment.get_config()
     cfg_train = cfg.counterfactual.train
     train_split, eval_split = get_splits()
-    probability = load_classifier_probability()
-    train_split = condition_split(probability, train_split)
-    eval_split = condition_split(probability, eval_split)
+    classifier = load_classifier()
+    train_split = ConditionedSplit(train_split, classifier)
+    eval_split = ConditionedSplit(eval_split, classifier)
     model = get_counterfactual_model()
     train_loader, eval_loader = get_loaders(
         train_split, eval_split, batch_size=cfg_train.batch_size, n_workers=cfg.user.n_workers

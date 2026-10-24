@@ -9,8 +9,6 @@ Usage::
     uv run evaluate_classifier.py --config-name ae final=true
 """
 
-from typing import cast
-
 import torch
 
 from drytorch import Test
@@ -25,7 +23,7 @@ from src.lib.events import ConfusionMatrixEvent
 from src.lib.models import get_mlp_model, load_trained_state
 from src.lib.objectives import BinaryClassMetrics
 from src.trackers import get_trackers
-from src.utils.svc import get_svc_confusion_matrix, load_svc
+from src.sklearn.svc import get_svc_confusion_matrix, load_svc
 
 
 def evaluate_mlp(eval_split: DataSplit) -> tuple[torch.Tensor, int, str]:
@@ -42,9 +40,9 @@ def evaluate_mlp(eval_split: DataSplit) -> tuple[torch.Tensor, int, str]:
     model = get_mlp_model()
     load_trained_state(model)
     _, eval_loader = get_loaders(eval_split, eval_split, batch_size=cfg.classification.train.batch_size)
-    test = Test(model, loader=eval_loader, metric=BinaryClassMetrics(), name='Classification')
-    test()
-    return cast(BinaryClassMetrics, test.objective).confusion_matrix, model.epoch, model.name
+    metrics = BinaryClassMetrics()
+    Test(model, loader=eval_loader, metric=metrics, name='Classification')()
+    return metrics.confusion_matrix, model.epoch, model.name
 
 
 def evaluate_svc(eval_split: DataSplit) -> tuple[torch.Tensor, int, str]:

@@ -1,7 +1,6 @@
 """Models of the experiment and the loading of the trained ones."""
 
 import logging
-from collections.abc import Callable
 from typing import Any
 
 import torch
@@ -10,9 +9,7 @@ from drytorch.core.exceptions import ModelNotFoundError
 from drytorch.lib.models import Model
 
 from src.config.experiment import Experiment
-from src.config.options import Classifiers
 from src.data.structures import Inputs, Outputs
-from src.utils.svc import load_svc_probability
 from src.module import Autoencoder, CounterfactualVAE, MLPClassifier
 
 __all__ = [
@@ -22,7 +19,6 @@ __all__ = [
     'get_autoencoder_model',
     'get_counterfactual_model',
     'get_mlp_model',
-    'load_classifier_probability',
     'load_pretrained_encoder',
     'load_trained_state',
 ]
@@ -46,6 +42,20 @@ class ClassifierModel(Model[Inputs, torch.Tensor]):
     """
 
     module: MLPClassifier
+
+    @torch.inference_mode()
+    def probability(self, features: torch.Tensor, /) -> torch.Tensor:
+        """Get the probability of typical development.
+
+        Args:
+            features: connections ``(N, n_features)``.
+
+        Returns:
+            The probabilities ``(N, 1)``, on the device of the features.
+        """
+        self.module.eval()
+        inputs = Inputs(features=features.to(self.device), condition=torch.empty(0))
+        return torch.sigmoid(self(inputs)).to(features.device)
 
 
 class CounterfactualModel(Model[Inputs, Outputs]):
@@ -74,32 +84,6 @@ def get_mlp_model() -> ClassifierModel:
     """Get the MLP classifier, named after the configured classifier."""
     cfg = Experiment.get_config()
     return ClassifierModel(MLPClassifier(), name=cfg.classification.model.name, device=cfg.user.device)
-
-
-def load_classifier_probability() -> Callable[[torch.Tensor], torch.Tensor]:
-    """Load the trained classifier and get its probability of typical development.
-
-    Returns:
-        A function from the connections ``(N, n_features)`` to the probabilities ``(N, 1)``, on
-        the same device.
-
-    Raises:
-        RuntimeError: if the experiment holds no trained classifier.
-    """
-    cfg = Experiment.get_config()
-    if cfg.classification.model.name == Classifiers.SVC:
-        return load_svc_probability()
-
-    model = get_mlp_model()
-    load_trained_state(model)
-    module = model.module.eval()
-
-    @torch.inference_mode()
-    def _probability(features: torch.Tensor) -> torch.Tensor:
-        inputs = Inputs(features=features.to(model.device), condition=torch.empty(0))
-        return torch.sigmoid(module(inputs)).to(features.device)
-
-    return _probability
 
 
 def load_pretrained_encoder(classifier: MLPClassifier, /) -> None:

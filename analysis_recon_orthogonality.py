@@ -25,15 +25,21 @@ Usage::
 
 import argparse
 import dataclasses
+import pathlib
 
 from collections.abc import Sequence
 from typing import Final
 
 import numpy as np
+import torch
 
 from scipy import stats
 
-from src.utils.analysis import AnalysisSetup, load_setup
+from src.config import ExperimentConfig, Experiment, get_experiment_config
+from src.data import get_splits
+from src.data.derived_datasets import ConditionedSplit, load_classifier
+from src.module import CounterfactualVAE
+from src.utils.analysis import AnalysisSetup
 
 BANNER_WIDTH: Final = 78
 COLUMN_GAP: Final = ' ' * 2
@@ -132,6 +138,40 @@ def analyse(classifier: str, overrides: Sequence[str], n_null: int, seed: int) -
     return summaries
 
 
+def load_setup(classifier: str, overrides: Sequence[str] = ('final=true',)) -> AnalysisSetup:
+    """Load the trained counterfactual VAE conditioned on a classifier.
+
+    Args:
+        classifier: the conditioning classifier, which names the entry configuration: ``svc``, ``mlp`` or ``ae``.
+        overrides: the Hydra overrides the models were trained with.
+
+    Returns:
+        The models and the partitions of the experiment.
+
+    Raises:
+        RuntimeError: if the experiment holds no trained models.
+    """
+    cfg = get_experiment_config(classifier, overrides=list(overrides))
+    exp = Experiment(cfg, name=cfg.name, par_dir=cfg.par_dir)
+    with exp.create_run(resume=True, record=False):
+        trained_classifier = load_classifier()
+        train_split, test_split = get_splits()
+        splits = {
+            'train': ConditionedSplit(train_split, trained_classifier),
+            'test': ConditionedSplit(test_split, trained_classifier),
+        }
+
+        # drytorch numbers a repeated model name in a process, so the weights are read directly
+        module = CounterfactualVAE()
+        module.load_state_dict(torch.load(_get_last_state(cfg), map_location='cpu', weights_only=True))
+
+    partitions = {
+        name: (split.features.numpy(), split.labels.squeeze(1).long().numpy(), split.conditions.squeeze(1).numpy())
+        for name, split in splits.items()
+    }
+    return AnalysisSetup(module=module.eval(), probability=trained_classifier.probability, partitions=partitions)
+
+
 def main() -> None:
     """Parse the arguments, run the tests for each classifier and print the summary."""
     parser = argparse.ArgumentParser(description='Test whether the residual is aligned with the counterfactual change.')
@@ -163,6 +203,17 @@ def _get_derangement(n: int, rng: np.random.Generator) -> np.ndarray:
         permutation = rng.permutation(n)
 
     return permutation
+
+
+def _get_last_state(cfg: ExperimentConfig) -> pathlib.Path:
+    # the checkpoints are in <run name>/<date>/<time>/<model name>/epoch_<epoch>
+    model_dirs = sorted((cfg.par_dir / 'checkpoints' / cfg.name).glob(f'*/*/{cfg.counterfactual.model.name}'))
+    epoch_dirs = list(model_dirs[-1].glob('epoch_*')) if model_dirs else []
+    if not epoch_dirs:
+        msg = f"No trained counterfactual VAE in the experiment '{cfg.name}': train it first."
+        raise RuntimeError(msg)
+
+    return max(epoch_dirs, key=lambda path: int(path.name.removeprefix('epoch_'))) / 'model_state.pt'
 
 
 def _logit(probabilities: np.ndarray) -> np.ndarray:

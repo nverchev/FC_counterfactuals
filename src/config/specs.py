@@ -227,8 +227,7 @@ class ClassificationConfig(PhaseConfig):
         train: Training of the MLP classifiers.
         model: Classifier to train, whose probabilities condition the counterfactual VAE.
         rescale_steps: How many times the probabilities of each classifier are rescaled
-            towards the middle before conditioning the VAE (see
-            :func:`~src.data.conditions.rescale`).
+            towards the middle before conditioning the VAE.
     """
 
     model: Annotated[ClassifierArchitectureConfig | SVCConfig, Field(discriminator='name')]

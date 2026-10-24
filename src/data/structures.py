@@ -19,8 +19,7 @@ class Inputs(NamedTuple):
 
     Attributes:
         features: Connections above the diagonal of the connectivity matrices ``(B, n_features)``.
-        condition: Probability of the conditioning classifier ``(B, 1)``; the classifiers and
-            the autoencoder do not read it.
+        condition: Probability of the conditioning classifier ``(B, 1)`` (only for conditional autoencoders).
     """
 
     features: torch.Tensor

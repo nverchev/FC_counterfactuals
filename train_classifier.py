@@ -19,7 +19,7 @@ from src.lib import get_learning_schema, get_loaders
 from src.lib.hooks import register_checkpointing, register_early_stopping
 from src.lib.models import get_mlp_model, load_pretrained_encoder
 from src.lib.objectives import get_classifier_loss
-from src.utils.svc import fit_and_save_svc
+from src.sklearn.svc import fit_and_save_svc
 
 
 def train_mlp(train_split: DataSplit, eval_split: DataSplit) -> None:

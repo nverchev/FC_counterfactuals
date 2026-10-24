@@ -61,6 +61,14 @@ class AbideDataBuilder(DataBuilder):
         return
 
     @property
+    def atlas_path(self) -> pathlib.Path:
+        """File of the atlas whose regions are the nodes of the connectivity matrices."""
+        atlas_dir = (
+            self.dataset_dir / 'ABIDE_pcp' / 'basc_multiscale_2015' / 'template_cambridge_basc_multiscale_nii_sym'
+        )
+        return atlas_dir / f'template_cambridge_basc_multiscale_sym_scale{RESOLUTION:03d}.nii.gz'
+
+    @property
     def matrices_dir(self) -> pathlib.Path:
         """Folder of the correlation matrices."""
         return self.dataset_dir / f'corr_matrices_{RESOLUTION}'

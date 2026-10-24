@@ -8,21 +8,18 @@ Usage::
 
 import logging
 
-import torch
-
 from drytorch.lib import loading
 
 from src.config import ExperimentConfig, Experiment, hydra_main
 from src.config.options import CounterfactualTargets
 from src.data import get_splits
+from src.data.abide import AbideDataBuilder
 from src.trackers import get_trackers
-from src.data.conditions import condition_split
-from src.utils.counterfactuals import get_targets
-from src.lib.models import get_counterfactual_model, load_classifier_probability, load_trained_state
-from src.utils.plotting import LABEL_NAMES, describe_probability, publish_connectome
+from src.data.derived_datasets import ConditionedSplit, CounterfactualSplit, ReconstructedSplit, load_classifier
+from src.lib.models import get_counterfactual_model, load_trained_state
+from src.utils.plotting import LABEL_NAMES, describe_probability, get_region_coordinates, publish_connectome
 
 
-@torch.inference_mode()
 def visualize() -> None:
     """Publish the figures of the configured subjects.
 
@@ -30,45 +27,39 @@ def visualize() -> None:
         Publishes a reconstruction and a counterfactual figure for each subject.
     """
     cfg = Experiment.get_config()
-    probability = load_classifier_probability()
+    classifier = load_classifier()
     _, eval_split = get_splits()
-    eval_split = condition_split(probability, eval_split)
+    eval_split = ConditionedSplit(eval_split, classifier)
     model = get_counterfactual_model()
     load_trained_state(model, epoch=cfg.user.load or -1)
 
-    module = model.module.eval()
     if cfg.user.plot.sample_indices:
-        indices, (inputs, targets) = loading.take_from_dataset(
-            eval_split, indices=cfg.user.plot.sample_indices, device=model.device
-        )
+        indices, _ = loading.take_from_dataset(eval_split, indices=cfg.user.plot.sample_indices)
     else:
-        indices, (inputs, targets) = loading.take_from_dataset(
-            eval_split, n_samples=cfg.counterfactual.train.batch_size, preserve_order=False, device=model.device
+        indices, _ = loading.take_from_dataset(
+            eval_split, n_samples=cfg.counterfactual.train.batch_size, preserve_order=False
         )
 
-    # in evaluation mode the latent is the posterior mean, so every target shares the reconstruction
-    counterfactuals = {}
+    derived_splits: dict[str, ReconstructedSplit | CounterfactualSplit] = {}
+    derived_splits['reconstruction'] = ReconstructedSplit(eval_split, model.module, classifier)
     for target in CounterfactualTargets:
-        goals = get_targets(inputs.condition, target)
-        counterfactuals[target], recon, _ = module.counterfactual(inputs.features, inputs.condition, goals)
+        counterfactuals = CounterfactualSplit(eval_split, model.module, classifier, denoise=True, target=target)
+        derived_splits[f'target_{target}'] = counterfactuals
 
-    original_probabilities = probability(inputs.features).squeeze(1).tolist()
-    recon_probabilities = probability(recon).squeeze(1).tolist()
-    counterfactual_probabilities = {
-        target: probability(counterfactual).squeeze(1).tolist() for target, counterfactual in counterfactuals.items()
-    }
+    coordinates = get_region_coordinates(AbideDataBuilder().atlas_path)
     partition = 'test' if cfg.final else 'val'
-    for i, index in enumerate(indices):
+    for index in indices:
         subject_id = eval_split.subject_ids[index]
         folder = f'{partition}/subject_{subject_id}'
-        label = LABEL_NAMES[int(targets.label[i].item())]
-        caption = f'{label}, {describe_probability(original_probabilities[i])}'
-        publish_connectome(inputs.features[i], title='original', caption=caption, folder=folder)
-        caption = describe_probability(recon_probabilities[i])
-        publish_connectome(recon[i], title='reconstruction', caption=caption, folder=folder)
-        for target, counterfactual in counterfactuals.items():
-            caption = describe_probability(counterfactual_probabilities[target][i])
-            publish_connectome(counterfactual[i], title=f'target_{target}', caption=caption, folder=folder)
+        label = LABEL_NAMES[int(eval_split.labels[index].item())]
+        caption = f'{label}, {describe_probability(eval_split.probabilities[index].item())}'
+        features = eval_split.features[index]
+        publish_connectome(features, coordinates=coordinates, title='original', caption=caption, folder=folder)
+        for title, split in derived_splits.items():
+            caption = describe_probability(split.probabilities[index].item())
+            publish_connectome(
+                split.features[index], coordinates=coordinates, title=title, caption=caption, folder=folder
+            )
 
         logging.info('Published the figures of %s.', subject_id)
 

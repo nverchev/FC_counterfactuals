@@ -1,8 +1,8 @@
-"""Losses and metrics of the classifiers, the autoencoder and the counterfactual VAE."""
+"""Losses and metrics of the classifiers, the autoencoder, the counterfactual VAE and the counterfactuals."""
 
 from __future__ import annotations
 
-from typing import ClassVar, override
+from typing import TYPE_CHECKING, ClassVar, override
 
 import torch
 import torch.nn.functional as F
@@ -14,12 +14,16 @@ from drytorch.lib.objectives import DictLoss, Loss, LossWithMetrics, Metric, Obj
 from src.config.experiment import Experiment
 from src.data.structures import Outputs, Targets
 
+if TYPE_CHECKING:
+    from src.data.derived_datasets import ConditionedSplit, CounterfactualSplit
+
 __all__ = [
     'BinaryClassMetrics',
     'ConfusionMatrixAccumulator',
     'get_accuracy',
     'get_autoencoder_loss',
     'get_classifier_loss',
+    'get_counterfactual_metrics',
     'get_kld',
     'get_mse',
     'get_vae_loss',
@@ -207,6 +211,44 @@ def get_vae_loss() -> LossWithMetrics[Outputs, Targets]:
         return _get_mse(outputs.recon, targets.features)
 
     return Loss(_mse, name='MSE') + c_kld * get_kld()
+
+
+# ---------------------------------------------------------------------------
+# Counterfactuals
+# ---------------------------------------------------------------------------
+
+
+def get_counterfactual_metrics(split: ConditionedSplit, counterfactuals: CounterfactualSplit) -> dict[str, float]:
+    """Measure the counterfactuals of a split.
+
+    The metrics are:
+
+    - ``MSE`` and ``MAE``: distance of the counterfactuals from the originals;
+    - ``RMS_from_half``: root mean square distance of the new probabilities from 0.5;
+    - ``CFD``: root mean square distance of the new probabilities from the conditions;
+    - ``CFD_all_pairs``: the same distance over every pair of subjects, as version 1 computed
+      it by mistake, for the comparison with the published results;
+    - ``Success``: fraction of the predictions that the counterfactuals flip, which is the DBS
+      when the target is 0.5.
+
+    Args:
+        split: the original subjects.
+        counterfactuals: their counterfactuals.
+
+    Returns:
+        The value of each metric.
+    """
+    conditions = split.conditions
+    new_probabilities = counterfactuals.probabilities
+    flipped = (conditions >= 0.5) != (new_probabilities >= 0.5)
+    return {
+        'MSE': F.mse_loss(counterfactuals.features, split.features).item(),
+        'MAE': F.l1_loss(counterfactuals.features, split.features).item(),
+        'RMS_from_half': (new_probabilities - 0.5).pow(2).mean().sqrt().item(),
+        'CFD': (new_probabilities - conditions).pow(2).mean().sqrt().item(),
+        'CFD_all_pairs': (new_probabilities.view(1, -1) - conditions).pow(2).mean().sqrt().item(),
+        'Success': flipped.float().mean().item(),
+    }
 
 
 def _get_mse(recon: Tensor, features: Tensor) -> Tensor:
