@@ -43,6 +43,3 @@ exclude = ["tests", ".venv"]
 venvPath = "."
 venv = ".venv"
 typeCheckingMode = "basic"
-
-[tool.uv.sources]
-drytorch = { path = "../drytorch", editable = true }
